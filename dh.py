@@ -27,14 +27,13 @@ if __name__ == "__main__":
     client1 = C_ECDH()
     client1_public_key = client1.get_public_key()
 
-    client2 = C_ECDH(client1_public_key)
+    client2 = C_ECDH()
+    client2.set_peer_public_key(client1_public_key)
     client2_secrets = client2.generate_secret()
 
-    client1_secrets = client1.generate_secret(client2.get_public_key())
+    client1.set_peer_public_key(client2.get_public_key())
+    client1_secrets = client1.generate_secret()
 
     text = "hello world"
 
-    e_text_client1 = client1.encrypt(text)
-    e_text_client2 = client2.encrypt(text)
-
-    assert(client1.decrypt(e_text_client1) == client2.decrypt(e_text_client2))
+    assert(client1_secrets == client2_secrets)

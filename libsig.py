@@ -7,6 +7,7 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 
 import logging
+import struct
 
 class State:
     DHs:dh.C_ECDH = None # -> keypair
@@ -40,6 +41,7 @@ class State:
     def __init__(self, name):
         self.name = name
 
+
 class HEADER:
     DH = None
     PN = None
@@ -52,10 +54,20 @@ class HEADER:
         self.PN = PN
         self.N = N
 
-    def compose(data):
-        import json
-        r_header = json.loads(data)
-        return HEADER(r_header[0], r_header[1], r_header[2])
+    def serialize(self) -> bytes:
+        """
+        """
+        b_states = struct.pack("<ii", PN, N) + DH.get_public_key(pem=False).to_string()
+        return struct.pack("<i", len(b_states)) + b_states
+
+    def deserialize(data) -> HEADER:
+        """
+        """
+        _len = int.from_bytes(data[0:4])
+        PN, N = struct.unpack("<ii", data[4:12])
+        DH = data[12:len - 12]
+        return HEADER(DH, PN, N)
+
 
 class DHRatchet:
     def __init__(self, state: State, header: HEADER):

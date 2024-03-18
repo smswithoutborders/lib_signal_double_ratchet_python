@@ -25,18 +25,24 @@ class Person:
         self.dh.generate_secret()
         return self.dh.b_secrets
 
-    def rt_init(self, SK, dh_pub_key):
-        self.state = libsig.State(self.name)
-        self.state.logging = self.logging
-        self.state = libsig.DHRatchet.init(self.state, SK, dh_pub_key)
-        self.state.report_status()
+    def alice_init(self, SK, dh_pub_key):
+        """
+        """
+        self.state = libsig.DHRatchet.init(State(self.name), SK, dh_pub_key)
 
-    def send_message(self, plaintext, AD):
+    def bob_init(self, SK):
+        """
+        person2.rt_init(SK, None)
+        person1.rt_init(SK, person2.get_dh_public_key())
+        """
+        self.state = libsig.DHRatchet.init(State(self.name), SK, None)
+
+    def send_message(self, message, AD):
         self.state.CKs, mk = libsig.KDF_CK(self.state.CKs)
         header = libsig.HEADER(self.state.DHs, self.state.PN, self.state.Ns)
         self.state.Ns += 1
         self.state.report_status()
-        return header, libsig.ENCRYPT(mk, plaintext.encode(), 
+        return header, libsig.ENCRYPT(mk, message.encode(), 
                                       libsig.CONCAT(AD, header))
 
     def try_skip_message_keys(self, header, ciphertext, AD):
