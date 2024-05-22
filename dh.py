@@ -80,12 +80,10 @@ if __name__ == "__main__":
     client1_public_key = client1.get_public_key()
 
     client2 = ecdh()
+    client2_public_key = client2.get_public_key()
 
     client2_secrets = client2.get_derived_key(client1_public_key)
-
-    client1_secrets = client1.get_derived_key(client2.get_public_key())
-
-    text = "hello world"
+    client1_secrets = client1.get_derived_key(client2_public_key)
 
     assert(client1_secrets == client2_secrets)
 
@@ -94,10 +92,9 @@ if __name__ == "__main__":
     client1_public_key = client1.get_public_key()
 
     client2 = x25519()
+    client2_public_key = client2.get_public_key()
+
     client2_secrets = client2.get_derived_key(client1_public_key)
-
-    client1_secrets = client1.get_derived_key(client2.get_public_key())
-
-    text = "hello world"
+    client1_secrets = client1.get_derived_key(client2_public_key)
 
     assert(client1_secrets == client2_secrets)
