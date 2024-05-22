@@ -18,12 +18,8 @@ class Person:
     def get_dh_public_key(self):
         return self.state.DHs.get_public_key()
 
-    def ini_with_public_key(self, peer_pub_key):
-        self.dh.set_peer_public_key(peer_pub_key)
-
-    def get_sk(self):
-        self.dh.generate_secret()
-        return self.dh.b_secrets
+    def get_sk(self, peer_pub_key):
+        return self.dh.get_derived_key(peer_pub_key)
 
     def alice_init(self, SK, dh_pub_key):
         """

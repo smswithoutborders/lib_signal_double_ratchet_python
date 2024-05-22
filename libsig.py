@@ -10,7 +10,7 @@ import logging
 import struct
 
 class State:
-    DHs:dh.C_ECDH = None # -> keypair
+    DHs:dh.DH = None # -> keypair
     DHr:str = None # -> public key
 
     RK = None
@@ -60,7 +60,7 @@ class HEADER:
         b_states = struct.pack("<ii", PN, N) + DH.get_public_key(pem=False).to_string()
         return struct.pack("<i", len(b_states)) + b_states
 
-    def deserialize(data) -> HEADER:
+    def deserialize(data):
         """
         """
         _len = int.from_bytes(data[0:4])
@@ -94,11 +94,10 @@ class DHRatchet:
         return state
 
 def GENERATE_DH():
-    return dh.C_ECDH()
+    return dh.x25519()
 
 def DH(dh_pair, dh_pub):
-    dh_pair.set_peer_public_key(dh_pub)
-    return dh_pair.generate_secret()
+    return dh_pair.get_derived_key(dh_pub)
 
 def KDF_RK(rk, dh_out): #dh_out = pub_key
     length=32

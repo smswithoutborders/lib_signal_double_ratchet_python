@@ -9,14 +9,10 @@ def dh_handshake(person1, person2):
     person1_pub_key = person1.get_public_key()
 
     # Bob returns his public key initiazlied with Alice's public key
-    person2.ini_with_public_key(person1_pub_key)
     person2_pub_key = person2.get_public_key()
 
-    # handshake complete
-    person1.ini_with_public_key(person2_pub_key)
-
-    person1_sk = person1.get_sk()
-    person2_sk = person2.get_sk()
+    person1_sk = person1.get_sk(person2_pub_key)
+    person2_sk = person2.get_sk(person1_pub_key)
     assert(person1_sk == person2_sk)
 
     return person1_sk
@@ -83,7 +79,6 @@ def send_message(message, person1, person2):
         """
         r_int = random.randint(0, 1)
         person1, person2 = fn_persons[r_int]()
-
 
 def main():
     log_level = 'DEBUG'
