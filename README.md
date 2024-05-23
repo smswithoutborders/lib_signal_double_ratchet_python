@@ -1,5 +1,20 @@
 # SMSWithoutBorders - LibSig
 
+## Installation
+
+> Install if planning to use `pysqlcipher3`
+
+**Arch**
+```bash
+sudo pacman -S sqlcipher
+```
+
+**Ubuntu**
+```bash
+sudo apt-get install libsqlcipher-dev
+sudo apt install build-essential git cmake libsqlite3-dev
+sudo apt install sqlcipher
+```
 
 ## Requirements
 A shared secret is required to initialize the Ratchets. 

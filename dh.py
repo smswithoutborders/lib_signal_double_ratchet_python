@@ -33,6 +33,15 @@ class DH(ABC):
     def get_derived_key(self, public_key, info=None, salt=None):
         pass
 
+    def __get_derived_key__(self, public_key, info=None, salt=None):
+        shared_key = self.get_shared_key(public_key)
+        extended_derived_key = HKDF(algorithm=hashes.SHA256(),
+                           length=DH.size,
+                           salt=salt,
+                           info=info,).derive(shared_key)
+        keystore = Keystore()
+        keystore.store_key(keypair=(extended_derived_key[:32], extended_derived_key[32:]))
+
 class ecdh(DH):
     def __init__(self):
         """
@@ -53,13 +62,7 @@ class ecdh(DH):
         return b_secrets
 
     def get_derived_key(self, public_key, info=b"ecdh_key_exchange", salt=None):
-        shared_key = self.get_shared_key(public_key)
-        extended_derived_key = HKDF(algorithm=hashes.SHA256(),
-                           length=DH.size,
-                           salt=salt,
-                           info=info,).derive(shared_key)
-        keystore = Keystore()
-        keystore.store_key(keypair=(extended_derived_key[:32], extended_derived_key[32:]))
+        DH.__get_derived_key__(public_key, info, salt)
 
 
 class x25519(DH):
@@ -78,8 +81,7 @@ class x25519(DH):
         return self.keypair.exchange(public_key)
 
     def get_derived_key(self, public_key, info=b"x25591_key_exchange", salt=None) -> bytes:
-        shared_key = self.get_shared_key(public_key)
-        return HKDF(algorithm=hashes.SHA256(),length=DH.size,salt=salt,info=info,).derive(shared_key)
+        DH.__get_derived_key__(public_key, info, salt)
 
 
 if __name__ == "__main__":
