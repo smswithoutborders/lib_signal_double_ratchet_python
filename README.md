@@ -2,6 +2,10 @@
 
 ## Installation
 
+```bash
+pip3 install -r requirements.txt
+```
+
 > Install if planning to use `pysqlcipher3`
 
 **Arch**
