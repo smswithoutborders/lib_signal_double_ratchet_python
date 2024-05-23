@@ -1,2 +1,6 @@
 venv/*
 __pycache__/*
+*.db
+db_keys/*.db
+db/*.db
+sqlcipher/*

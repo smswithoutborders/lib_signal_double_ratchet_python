@@ -13,8 +13,9 @@ import binascii
 import base64
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
+
 class DH(ABC):
-    size = 32
+    size = 64
 
     @abstractmethod
     def get_public_key(self):
@@ -53,9 +54,15 @@ class ecdh(DH):
 
     def get_derived_key(self, public_key, info=b"ecdh_key_exchange", salt=None):
         shared_key = self.get_shared_key(public_key)
-        return HKDF(algorithm=hashes.SHA256(),length=DH.size,salt=salt,info=info,).derive(shared_key)
+        extended_derived_key = HKDF(algorithm=hashes.SHA256(),
+                           length=DH.size,
+                           salt=salt,
+                           info=info,).derive(shared_key)
+        keystore = Keystore()
+        keystore.store_key(keypair=(extended_derived_key[:32], extended_derived_key[32:]))
 
-class x25519(ABC):
+
+class x25519(DH):
     def __init__(self):
         self.keypair = X25519PrivateKey.generate()
 
