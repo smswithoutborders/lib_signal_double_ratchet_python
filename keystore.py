@@ -7,6 +7,8 @@ if os.environ.get("NOSECURE"):
 else:
     import sqlcipher3 as sqlite
 
+import uuid
+
 class Keystore:
     table_name = "_crypto"
     def __init__(self, db_name, mk):

@@ -13,9 +13,14 @@ import binascii
 import base64
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
+from keystore import Keystore
+
+import base64
+import secrets
+
 
 class DH(ABC):
-    size = 64
+    size = 32
 
     @abstractmethod
     def get_public_key(self):
@@ -26,21 +31,21 @@ class DH(ABC):
         pass
 
     @abstractmethod
-    def get_shared_key(self, public_key):
+    def __get_shared_key__(self, public_key):
         pass
 
     @abstractmethod
-    def get_derived_key(self, public_key, info=None, salt=None):
+    def agree(self, public_key, keystore_path, info=None, salt=None):
         pass
 
-    def __get_derived_key__(self, public_key, info=None, salt=None):
-        shared_key = self.get_shared_key(public_key)
+    def __agree__(secret_key, keystore_path, pk, _pk, info=b"x25591_key_exchange", salt=None):
         extended_derived_key = HKDF(algorithm=hashes.SHA256(),
                            length=DH.size,
                            salt=salt,
-                           info=info,).derive(shared_key)
-        keystore = Keystore()
-        keystore.store_key(keypair=(extended_derived_key[:32], extended_derived_key[32:]))
+                           info=info,).derive(secret_key)
+        keystore = Keystore(keystore_path, base64.b64encode(extended_derived_key).decode())
+        return keystore.store(keypair=(pk, _pk))
+
 
 class ecdh(DH):
     def __init__(self):
@@ -56,18 +61,21 @@ class ecdh(DH):
     def get_private_key(self):
         pass
 
-    def get_shared_key(self, public_key):
-        self.ecdh.load_received_public_key_pem(public_key)
-        b_secrets = self.ecdh.generate_sharedsecret_bytes()
-        return b_secrets
 
-    def get_derived_key(self, public_key, info=b"ecdh_key_exchange", salt=None):
-        DH.__get_derived_key__(public_key, info, salt)
+    def agree(self, public_key, keystore_path, info=b"x25591_key_exchange", salt=None) -> bytes:
+        self.ecdh.load_received_public_key_pem(public_key)
+        shared_key = self.ecdh.generate_sharedsecret_bytes()
+        return DH.__agree__(shared_key, keystore_path, _pk, info, salt)
 
 
 class x25519(DH):
     def __init__(self):
         self.keypair = X25519PrivateKey.generate()
+        """
+        - generate random shared keys
+        - use random shared keys to encrypt content
+        - return random shared keys
+        """
 
     def get_public_key(self):
         return self.keypair.public_key()
@@ -77,11 +85,14 @@ class x25519(DH):
                                               format=serialization.PrivateFormat.PKCS8,
                                               encryption_algorithm=serialization.NoEncryption()) 
 
-    def get_shared_key(self, public_key):
-        return self.keypair.exchange(public_key)
+    def agree(self, public_key, keystore_path, info=b"x25591_key_exchange", salt=None) -> bytes:
+        # shared_key = self.keypair.exchange(public_key)
 
-    def get_derived_key(self, public_key, info=b"x25591_key_exchange", salt=None) -> bytes:
-        DH.__get_derived_key__(public_key, info, salt)
+        secret_key = secrets.token_bytes(size) # store this
+        _pk = self.keypair.private_bytes(encoding=serialization.Encoding.PEM, 
+                                   format=serialization.PrivateFormat.PKCS8, 
+                                   encryption_algorithm=serialization.NoEncryption()) 
+        return secret_key, DH.__agree__(secret_key, keystore_path, _pk, info, salt)
 
 
 if __name__ == "__main__":
@@ -91,9 +102,8 @@ if __name__ == "__main__":
     client2 = ecdh()
     client2_public_key = client2.get_public_key()
 
-    client2_secrets = client2.get_derived_key(client1_public_key)
-    client1_secrets = client1.get_derived_key(client2_public_key)
-
+    pnt_keystore1 = client2.agree(client1_public_key, "db_keys/ecdh1.db")
+    pnt_keystore2 = client1.agree(client2_public_key, "db_keys/ecdh2.db")
     assert(client1_secrets == client2_secrets)
 
 
@@ -103,7 +113,6 @@ if __name__ == "__main__":
     client2 = x25519()
     client2_public_key = client2.get_public_key()
 
-    client2_secrets = client2.get_derived_key(client1_public_key)
-    client1_secrets = client1.get_derived_key(client2_public_key)
-
+    pnt_keystore1 = client2.agree(client1_public_key, "db_keys/x25519.1.db")
+    pnt_keystore2 = client1.agree(client2_public_key, "db_keys/x25519.2.db")
     assert(client1_secrets == client2_secrets)
