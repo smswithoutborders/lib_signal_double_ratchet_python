@@ -51,7 +51,6 @@ class Keystore:
 
         pk_values = []
         for row in rows:
-            print(f"+ decrypting {row[0]}...")
             # pk = libsig.DECRYPT(mk, row[1], b"public_key")
             # _pk = libsig.DECRYPT(mk, row[2], b"private_key")
             pk = row[2]

@@ -6,7 +6,7 @@ from ecdsa import ECDH, NIST256p
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 # X25519
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes 
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 from cryptography.hazmat.primitives import serialization
 import binascii
@@ -44,9 +44,6 @@ class DH(ABC):
         return secret_key
 
     def fetch(pnt_keystore, secret_key, keystore_path=None):
-        if not keystore_path:
-            keystore_path = f"db_keys/{pnt_keystore}.db"
-
         keystore = Keystore(keystore_path, secret_key)
         return keystore.fetch(pnt_keystore)
 
@@ -60,26 +57,29 @@ class ecdh(DH):
         self.pnt_keystore = pnt_keystore
         self.keystore_path = keystore_path
 
-    def get_public_key(self, keystore_path=None):
+    def get_public_key(self):
         ecdh = ECDH(curve=NIST256p)
         pk = ecdh.generate_private_key()
         pnt_keystore = uuid.uuid4().hex
-        if not keystore_path:
-            keystore_path = f"db_keys/{pnt_keystore}.db"
-        enc_key = DH.store(pk.to_string(), ecdh.private_key.to_string(), keystore_path, pnt_keystore)
-        return pk, pnt_keystore, enc_key
+
+        if not self.keystore_path:
+            self.keystore_path = f"db_keys/{pnt_keystore}.db"
+
+        return pk, pnt_keystore, DH.store(pk.to_string(), 
+                                          ecdh.private_key.to_string(), 
+                                          self.keystore_path, pnt_keystore)
 
     def agree(self, public_key, pnt_keystore, secret_key, info=b"x25591_key_exchange", salt=None) -> bytes:
-        ppk = DH.fetch(pnt_keystore, secret_key)
+        if not self.keystore_path:
+            self.keystore_path = f"db_keys/{pnt_keystore}.db"
+        ppk = DH.fetch(pnt_keystore, secret_key, self.keystore_path )
         if ppk:
-            print(ppk[1])
             ecdh = ECDH(curve=NIST256p)
             ecdh.load_private_key_bytes(ppk[1])
             # ecdh.load_received_public_key_pem(public_key)
             ecdh.load_received_public_key_bytes(public_key)
             shared_key = ecdh.generate_sharedsecret_bytes()
             return DH.__agree__(shared_key, info, salt)
-
 
 """
 class x25519(DH):
@@ -112,8 +112,8 @@ if __name__ == "__main__":
     client2 = ecdh()
     client2_public_key, pnt_keystore1, enc_key1 = client2.get_public_key()
 
-    dk = client2.agree(client1_public_key.to_string(), pnt_keystore, enc_key)
-    dk1 = client1.agree(client2_public_key.to_string(), pnt_keystore1, enc_key1)
+    dk = client1.agree(client2_public_key.to_string(), pnt_keystore, enc_key)
+    dk1 = client2.agree(client1_public_key.to_string(), pnt_keystore1, enc_key1)
 
     assert(dk != None)
     assert(dk1 != None)
