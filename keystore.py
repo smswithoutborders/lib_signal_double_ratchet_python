@@ -7,7 +7,6 @@ if os.environ.get("NOSECURE"):
 else:
     import sqlcipher3 as sqlite
 
-import uuid
 
 class Keystore:
     table_name = "_crypto"
@@ -23,19 +22,20 @@ class Keystore:
         self.cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS {self.table_name} (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pnt TEXT NOT NULL UNIQUE,
             pk BLOB NOT NULL, _pk BLOB NOT NULL,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
         ''')
 
-    def store(self, keypair: tuple): # (public, private)
+    def store(self, keypair: tuple, pnt): # (public, private)
         pk = keypair[0]
         _pk = keypair[1]
         # pk = libsig.ENCRYPT(mk, keypair[0], b"public_key")
         # _pk = libsig.ENCRYPT(mk, keypair[1], b"private_key")
         self.cursor.execute(f"PRAGMA key = '{self.mk}'")
-        self.cursor.execute(f'INSERT INTO {self.table_name} (pk, _pk) VALUES (?, ?)', 
-                       (pk, _pk,))
+        self.cursor.execute(f'INSERT INTO {self.table_name} (pnt, pk, _pk) VALUES (?, ?, ?)', 
+                       (pnt, pk, _pk,))
 
         auto_id = self.cursor.lastrowid
 
@@ -44,9 +44,9 @@ class Keystore:
 
         return auto_id
 
-    def fetch(self):
+    def fetch(self, pnt):
         self.cursor.execute(f"PRAGMA key = '{self.mk}'")
-        self.cursor.execute(f'SELECT * FROM {self.table_name}')
+        self.cursor.execute(f'SELECT * FROM {self.table_name} WHERE pnt = ?', (pnt,))
         rows = self.cursor.fetchall()
 
         pk_values = []
@@ -54,11 +54,11 @@ class Keystore:
             print(f"+ decrypting {row[0]}...")
             # pk = libsig.DECRYPT(mk, row[1], b"public_key")
             # _pk = libsig.DECRYPT(mk, row[2], b"private_key")
-            pk = row[1]
-            _pk = row[2]
+            pk = row[2]
+            _pk = row[3]
             pk_values.append((pk, _pk))
 
-        return pk_values
+        return None if len(pk_values) < 1 else pk_values[0]
 
 if __name__ == "__main__":
     # mk = (b"123abc"*6)[:32]
