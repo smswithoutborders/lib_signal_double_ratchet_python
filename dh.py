@@ -7,7 +7,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 # X25519
 from cryptography.hazmat.primitives import hashes 
-from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
 from cryptography.hazmat.primitives import serialization
 import binascii
 import base64
@@ -65,7 +65,7 @@ class ecdh(DH):
         if not self.keystore_path:
             self.keystore_path = f"db_keys/{pnt_keystore}.db"
 
-        return pk, pnt_keystore, DH.store(pk.to_string(), 
+        return pk.to_string(), pnt_keystore, DH.store(pk.to_string(), 
                                           ecdh.private_key.to_string(), 
                                           self.keystore_path, pnt_keystore)
 
@@ -81,39 +81,47 @@ class ecdh(DH):
             shared_key = ecdh.generate_sharedsecret_bytes()
             return DH.__agree__(shared_key, info, salt)
 
-"""
 class x25519(DH):
-    def __init__(self):
-        self.keypair = X25519PrivateKey.generate()
+    def __init__(self, pnt_keystore=None, keystore_path=None):
+        self.pnt_keystore = pnt_keystore
+        self.keystore_path = keystore_path
 
     def get_public_key(self):
-        return self.keypair.public_key()
+        x = X25519PrivateKey.generate()
+        pk = x.public_key().public_bytes_raw()
 
-    def agree(self, public_key, keystore_path, info=b"x25591_key_exchange", salt=None) -> bytes:
-        # shared_key = self.keypair.exchange(public_key)
+        """
+        _pk = x.private_bytes(encoding=serialization.Encoding.PEM, 
+                              format=serialization.PrivateFormat.PKCS8, 
+                              encryption_algorithm=serialization.NoEncryption()) 
+        """
+        _pk = x.private_bytes_raw()
+        pnt_keystore = uuid.uuid4().hex
 
-        secret_key = secrets.token_bytes(self.size) # store this
-        _pk = self.keypair.private_bytes(encoding=serialization.Encoding.PEM, 
-                                   format=serialization.PrivateFormat.PKCS8, 
-                                   encryption_algorithm=serialization.NoEncryption()) 
-        return secret_key, DH.__agree__(secret_key, keystore_path, _pk, info, salt)
-"""
+        if not self.keystore_path:
+            self.keystore_path = f"db_keys/{pnt_keystore}.db"
+
+        return pk, pnt_keystore, DH.store(pk, _pk, self.keystore_path, pnt_keystore)
+
+    def agree(self, public_key, pnt_keystore, secret_key, info=b"x25591_key_exchange", salt=None) -> bytes:
+        if not self.keystore_path:
+            self.keystore_path = f"db_keys/{pnt_keystore}.db"
+        ppk = DH.fetch(pnt_keystore, secret_key, self.keystore_path )
+        if ppk:
+            x = X25519PrivateKey.from_private_bytes(ppk[1])
+            shared_key = x.exchange(X25519PublicKey.from_public_bytes(public_key))
+            return DH.__agree__(shared_key, info, salt)
 
 
 if __name__ == "__main__":
     client1 = ecdh()
     client1_public_key, pnt_keystore, enc_key = client1.get_public_key()
-    """
-    import base4
-    public_key = base64.b64encode(client1_public_key.to_string())
-    public_key = client1_public_key.to_pem()
-    """
 
     client2 = ecdh()
     client2_public_key, pnt_keystore1, enc_key1 = client2.get_public_key()
 
-    dk = client1.agree(client2_public_key.to_string(), pnt_keystore, enc_key)
-    dk1 = client2.agree(client1_public_key.to_string(), pnt_keystore1, enc_key1)
+    dk = client1.agree(client2_public_key, pnt_keystore, enc_key)
+    dk1 = client2.agree(client1_public_key, pnt_keystore1, enc_key1)
 
     assert(dk != None)
     assert(dk1 != None)
@@ -121,14 +129,16 @@ if __name__ == "__main__":
     assert(dk == dk1)
 
 
-    """
     client1 = x25519()
-    client1_public_key = client1.get_public_key()
+    client1_public_key, pnt_keystore, enc_key = client1.get_public_key()
 
     client2 = x25519()
-    client2_public_key = client2.get_public_key()
+    client2_public_key, pnt_keystore1, enc_key1 = client2.get_public_key()
 
-    pnt_keystore1 = client2.agree(client1_public_key, "db_keys/x25519.1.db")
-    pnt_keystore2 = client1.agree(client2_public_key, "db_keys/x25519.2.db")
-    assert(client1_secrets == client2_secrets)
-    """
+    dk = client1.agree(client2_public_key, pnt_keystore, enc_key)
+    dk1 = client2.agree(client1_public_key, pnt_keystore1, enc_key1)
+
+    assert(dk != None)
+    assert(dk1 != None)
+
+    assert(dk == dk1)
