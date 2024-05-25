@@ -5,6 +5,7 @@
 ```bash
 pip3 install -r requirements.txt
 ```
+<br>
 
 > Install if planning to use `pysqlcipher3`
 
@@ -20,53 +21,26 @@ sudo apt install build-essential git cmake libsqlite3-dev
 sudo apt install sqlcipher
 ```
 
-## Requirements
-A shared secret is required to initialize the Ratchets. 
 
-This can be achieved by performing a DH handshake between the parties,
-both of them store their public keys and whomever messages first becomes Alice.
+## DH Key exchanges Examples
+```python3
+from dh import x25519
 
-**Not in the scope of this document.**
-
-
-It is important to know who is initializing the messages.
-
-For server/client, the server key can be stored on the client,
-allowing the client to always initialize the conversation.
-
-Client = Alice
-
-Server = Bob
-
-```python
-alice = Person('Alice')
-
-bob = Person('Bob')
-
-```
-
-After handshakes, messages can now be exchanged..
-
-```python
-# ------- On Sending the message ----
-
-bobs_public_key = ...
-
+client1 = x25519()
 """
-Header has to be transmitted alongside cipher text.
-
-Protocol used for sending header and cipher text 
-would depend on developer.
+pnt_keystore:- store to fetch the private key later
+enc_key:- required to decrypt the encrypted sql file (if encrypted)
 """
-header: Header, cipher_text: bytes = \
-    alice.send_message(message='hello world', AD=bobs_public_key)
+client1_public_key, pnt_keystore, enc_key = client1.get_public_key()
 
-header_serialized: bytes = header.serialize()
+client2 = x25519()
+client2_public_key, pnt_keystore1, enc_key1 = client2.get_public_key()
 
+dk = client1.agree(client2_public_key, pnt_keystore, enc_key)
+dk1 = client2.agree(client1_public_key, pnt_keystore1, enc_key1)
 
-# ------- On receiving the message ----
+assert(dk != None)
+assert(dk1 != None)
 
-header, cipher_text = get_alice_messages()
-
-message = bob.read_message(header, cipher_text, AD)
+assert(dk == dk1)
 ```
