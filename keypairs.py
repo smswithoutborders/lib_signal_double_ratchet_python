@@ -23,11 +23,15 @@ class Keypairs(ABC):
     size = 32
 
     @abstractmethod
-    def get_public_key(self):
+    def init(self):
         pass
 
     @abstractmethod
-    def agree(self, public_key, pnt_keystore, secret_key, info, salt):
+    def agree(self, public_key, info, salt):
+        pass
+
+    @abstractmethod
+    def get_public_key(self):
         pass
 
     def store(pk, _pk, keystore_path, pnt_keystore, info=b"x25591_key_exchange", salt=None):
@@ -53,26 +57,32 @@ class Keypairs(ABC):
 
 
 class ecdh(Keypairs):
-    def __init__(self, pnt_keystore=None, keystore_path=None):
+    def __init__(self, pnt_keystore=None, keystore_path=None, secret_key=None):
         self.pnt_keystore = pnt_keystore
         self.keystore_path = keystore_path
 
-    def get_public_key(self):
+    def init(self):
         ecdh = ECDH(curve=NIST256p)
         pk = ecdh.generate_private_key()
-        pnt_keystore = uuid.uuid4().hex
+        self.pnt_keystore = uuid.uuid4().hex
 
         if not self.keystore_path:
-            self.keystore_path = f"db_keys/{pnt_keystore}.db"
+            self.keystore_path = f"db_keys/{self.pnt_keystore}.db"
 
-        return pk.to_string(), pnt_keystore, Keypairs.store(pk.to_string(), 
-                                          ecdh.private_key.to_string(), 
-                                          self.keystore_path, pnt_keystore)
+        self.secret_key = Keypairs.store(pk.to_string(), 
+                                         ecdh.private_key.to_string(), 
+                                         self.keystore_path, 
+                                         self.pnt_keystore)
+        return pk.to_string()
 
-    def agree(self, public_key, pnt_keystore, secret_key, info=b"x25591_key_exchange", salt=None) -> bytes:
+    def get_public_key(self):
+        ppk = Keypairs.fetch(self.pnt_keystore, self.secret_key, self.keystore_path )
+        return ppk[0]
+
+    def agree(self, public_key, info=b"x25591_key_exchange", salt=None) -> bytes:
         if not self.keystore_path:
             self.keystore_path = f"db_keys/{pnt_keystore}.db"
-        ppk = Keypairs.fetch(pnt_keystore, secret_key, self.keystore_path )
+        ppk = Keypairs.fetch(self.pnt_keystore, self.secret_key, self.keystore_path )
         if ppk:
             ecdh = ECDH(curve=NIST256p)
             ecdh.load_private_key_bytes(ppk[1])
@@ -81,12 +91,12 @@ class ecdh(Keypairs):
             shared_key = ecdh.generate_sharedsecret_bytes()
             return Keypairs.__agree__(shared_key, info, salt)
 
+
 class x25519(Keypairs):
-    def __init__(self, pnt_keystore=None, keystore_path=None):
-        self.pnt_keystore = pnt_keystore
+    def __init__(self, keystore_path=None):
         self.keystore_path = keystore_path
 
-    def get_public_key(self):
+    def init(self):
         x = X25519PrivateKey.generate()
         pk = x.public_key().public_bytes_raw()
 
@@ -96,17 +106,22 @@ class x25519(Keypairs):
                               encryption_algorithm=serialization.NoEncryption()) 
         """
         _pk = x.private_bytes_raw()
-        pnt_keystore = uuid.uuid4().hex
+        self.pnt_keystore = uuid.uuid4().hex
 
         if not self.keystore_path:
-            self.keystore_path = f"db_keys/{pnt_keystore}.db"
+            self.keystore_path = f"db_keys/{self.pnt_keystore}.db"
 
-        return pk, pnt_keystore, Keypairs.store(pk, _pk, self.keystore_path, pnt_keystore)
+        self.secret_key = Keypairs.store(pk, _pk, self.keystore_path, self.pnt_keystore)
+        return pk
 
-    def agree(self, public_key, pnt_keystore, secret_key, info=b"x25591_key_exchange", salt=None) -> bytes:
+    def get_public_key(self):
+        ppk = Keypairs.fetch(self.pnt_keystore, self.secret_key, self.keystore_path )
+        return ppk[0]
+
+    def agree(self, public_key, info=b"x25591_key_exchange", salt=None) -> bytes:
         if not self.keystore_path:
             self.keystore_path = f"db_keys/{pnt_keystore}.db"
-        ppk = Keypairs.fetch(pnt_keystore, secret_key, self.keystore_path )
+        ppk = Keypairs.fetch(self.pnt_keystore, self.secret_key, self.keystore_path )
         if ppk:
             x = X25519PrivateKey.from_private_bytes(ppk[1])
             shared_key = x.exchange(X25519PublicKey.from_public_bytes(public_key))
@@ -115,30 +130,28 @@ class x25519(Keypairs):
 
 if __name__ == "__main__":
     client1 = ecdh()
-    client1_public_key, pnt_keystore, enc_key = client1.get_public_key()
+    client1_public_key = client1.init()
 
     client2 = ecdh()
-    client2_public_key, pnt_keystore1, enc_key1 = client2.get_public_key()
+    client2_public_key = client2.init()
 
-    dk = client1.agree(client2_public_key, pnt_keystore, enc_key)
-    dk1 = client2.agree(client1_public_key, pnt_keystore1, enc_key1)
+    dk = client1.agree(client2_public_key)
+    dk1 = client2.agree(client1_public_key)
 
     assert(dk != None)
     assert(dk1 != None)
-
     assert(dk == dk1)
 
 
     client1 = x25519()
-    client1_public_key, pnt_keystore, enc_key = client1.get_public_key()
+    client1_public_key = client1.init()
 
     client2 = x25519()
-    client2_public_key, pnt_keystore1, enc_key1 = client2.get_public_key()
+    client2_public_key = client2.init()
 
-    dk = client1.agree(client2_public_key, pnt_keystore, enc_key)
-    dk1 = client2.agree(client1_public_key, pnt_keystore1, enc_key1)
+    dk = client1.agree(client2_public_key)
+    dk1 = client2.agree(client1_public_key)
 
     assert(dk != None)
     assert(dk1 != None)
-
     assert(dk == dk1)

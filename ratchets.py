@@ -20,33 +20,32 @@ class Ratchets:
     MAX_SKIP = 20
 
     def alice_init(state: States, SK: bytes, bobsPublicKey: bytes, keystore_path: str=None):
-        state.DHs = GENERATE_DH() # TODO: some parameters for storage
+        state.DHs = GENERATE_DH(keystore_path) # TODO: some parameters for storage
         state.DHr = bobsPublicKey
-        state.public_key, state.pnt_keystore, state.enc_key, shared_secret = \
-            DH(state.DHs, state.DHr, keystore_path)
+        shared_secret = DH(state.DHs, state.DHr)
         state.RK, state.CKs = KDF_RK(SK, shared_secret)
-
 
     def bob_init(state: States, SK: bytes, bobsKeyPair: Keypairs):
         state.DHs = bobsKeyPair
+        state.DHs.init()
         state.RK = SK
 
     def encrypt(state: States, data: bytes, AD: bytes):
         state.CKs, mk = KDF_CK(state.CKs)
-        header = HEADERS(state.public_key, state.PN, state.Ns)
+        header = HEADERS(state.DHs, state.PN, state.Ns)
         state.Ns += 1
         return header, ENCRYPT(mk, data, CONCAT(AD, header))
 
-    def decrypt(state: States, header: HEADERS, data_cipher: bytes, AD: bytes):
-        plaintext = try_skip_message_keys(state, header, ciphertext, AD)
+    def decrypt(state: States, header: HEADERS, ciphertext: bytes, AD: bytes):
+        plaintext = Ratchets.try_skip_message_keys(state, header, ciphertext, AD)
         if plaintext:
             return plaintext
 
         if header.dh != state.DHr:
-            skip_message_keys(state, header.pn)
+            Ratchets.skip_message_keys(state, header.pn)
             DHRatchet(state, header)
 
-        skip_message_keys(header.n)
+        Ratchets.skip_message_keys(state, header.n)
         state.CKr, mk = KDF_CK(state.CKr)
         state.Nr += 1
         return DECRYPT(mk, ciphertext, CONCAT(AD, header))
@@ -58,7 +57,7 @@ class Ratchets:
             return DECRYPT(mk, ciphertext, CONCAT(AD, header))
 
     def skip_message_keys(state, until):
-        if state.Nr + MAX_SKIP < until:
+        if state.Nr + Ratchets.MAX_SKIP < until:
             raise Exception("MAX_SKIP Exceeded")
 
         if state.CKr:
@@ -71,27 +70,31 @@ if __name__ == "__main__":
     from keypairs import x25519
 
     alice = x25519()
-    alice_public_key, pnt_keystore, enc_key = alice.get_public_key()
+    alice_public_key_original = alice.init()
 
     bob = x25519("db_keys/bobs_keys.db")
-    bob_public_key, pnt_keystore1, enc_key1 = bob.get_public_key()
+    bob_public_key_original = bob.init()
 
-    SK = alice.agree(bob_public_key, pnt_keystore, enc_key)
-    SK1 = bob.agree(alice_public_key, pnt_keystore1, enc_key1)
+    SK = alice.agree(bob_public_key_original)
+    SK1 = bob.agree(alice_public_key_original)
 
     assert(SK == SK1)
+
+    # .... assuming in change in time 
 
     original_plaintext = b"Hello world"
 
     alice_state = States()
     bob_state = States()
 
-    Ratchets.alice_init(alice_state, SK, bob_public_key)
+    Ratchets.alice_init(alice_state, SK, bob_public_key_original, "db_keys/alice_keys.db")
+    print("keystore path:", alice_state.DHs.keystore_path)
+    print("keystore sk:", alice_state.DHs.secret_key)
     header, alice_ciphertext = Ratchets.encrypt(
-        alice_state, original_plaintext, bob_public_key)
+        alice_state, original_plaintext, bob_public_key_original)
 
+    bob = x25519("db_keys/bobs_keys.db")
     Ratchets.bob_init(bob_state, SK1, bob)
-    bob_plaintext = Ratchets.decrypt(
-        bob_state, header, alice_ciphertext, bob_state.public_key)
+    bob_plaintext = Ratchets.decrypt(bob_state, header, alice_ciphertext, bob_public_key_original)
 
     assert(original_plaintext == bob_plaintext)

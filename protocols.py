@@ -11,12 +11,12 @@ import struct
 import helpers
 
 class States:
-    DHs: Keypairs
-    DHr: bytes
+    DHs: Keypairs = None
+    DHr: bytes = None
 
-    RK: bytes
-    CKs: bytes
-    CKr: bytes
+    RK: bytes = None
+    CKs: bytes = None
+    CKr: bytes = None
 
     Ns = 0
     Nr = 0
@@ -24,10 +24,6 @@ class States:
     PN = 0
 
     MKSKIPPED = {}
-
-    public_key: bytes
-    pnt_keystore: str
-    enc_key: bytes
 
 
 class HEADERS:
@@ -37,8 +33,8 @@ class HEADERS:
     
     LEN = None
     
-    def __init__(self, dh=None, pn=None, n=None):
-        self.dh = dh
+    def __init__(self, dh: Keypairs=None, pn=None, n=None):
+        self.dh = dh.get_public_key()
         self.pn = pn
         self.n = n
 
@@ -51,26 +47,24 @@ class HEADERS:
 
 
 class DHRatchet:
-    def __init__(self, state: States, header: HEADERS, keystore_path: str=None):
+    def __init__(self, state: States, header: HEADERS):
         state.PN = state.Ns
         state.Ns = 0
         state.Nr = 0
 
         state.DHr = header.dh
-        state.public_key, state.pnt_keystore, state.enc_key, dk = \
-            DH(state.DHs, state.DHr, keystore_path)
-        state.RK, state.CKr = KDF_RK(state.RK, dk)
-        state.DHs = GENERATE_DH(keystore_path)
-        state.public_key, state.pnt_keystore, state.enc_key, dk = \
-            DH(state.DHs, state.DHr, keystore_path)
-        state.RK, state.CKs = KDF_RK(state.RK, dk)
+        state.RK, state.CKr = KDF_RK(state.RK, DH(state.DHs, state.DHr))
+        state.DHs = GENERATE_DH(state.DHs.keystore_path)
+        state.RK, state.CKr = KDF_RK(state.RK, DH(state.DHs, state.DHr))
 
-def GENERATE_DH(keystore_path: str=None):
-    return x25519(keystore_path=keystore_path)
 
-def DH(dh_pair: Keypairs, dh_pub: bytes, keystore_path: str):
-    public_key, pnt_keystore, enc_key = dh_pair.get_public_key()
-    return public_key, pnt_keystore, enc_key, dh_pair.agree(dh_pub, pnt_keystore, enc_key)
+def GENERATE_DH(keystore_path: str=None) -> bytes:
+    x = x25519(keystore_path=keystore_path)
+    x.init()
+    return x
+
+def DH(dh_pair: Keypairs, dh_pub: bytes) -> bytes:
+    return dh_pair.agree(dh_pub)
 
 def KDF_RK(rk, dh_out): 
     length=32
@@ -102,7 +96,7 @@ def ENCRYPT(mk, plaintext, associated_data) -> bytes:
 
 def DECRYPT(mk, ciphertext, associated_data):
     # Throws an exception in case cannot verify
-    cipher_text = verify_signature(mk, ciphertext, associated_data)
+    cipher_text = helpers.verify_signature(mk, ciphertext, associated_data)
     key, _, _ = get_mac_parameters(mk)
     iv = cipher_text[:AES.block_size]
     data = cipher_text[AES.block_size:]
