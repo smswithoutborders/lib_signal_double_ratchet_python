@@ -24,30 +24,18 @@ sudo apt install sqlcipher
 
 ## DH Key exchanges Examples
 ```python3
-from dh import x25519
+from keypairs import x25519
 
-client1 = x25519()
+alice = x25519()
+alice_public_key_original = alice.init()
 
-# pnt_keystore:- store to fetch the private key later
-# enc_key:- required to decrypt the encrypted sql file (if encrypted)
-client1_public_key, pnt_keystore, enc_key = client1.get_public_key()
+bob = x25519("db_keys/bobs_keys.db")
+bob_public_key_original = bob.init() # not an encryption key, won't work unless for AD
 
-client2 = x25519()
-client2_public_key, pnt_keystore1, enc_key1 = client2.get_public_key()
+SK = alice.agree(bob_public_key_original)
+SK1 = bob.agree(alice_public_key_original)
 
-# Agreement
-private_keystore_path1 = "db_keys/client1.db"
-private_keystore_path2 = "db_keys/client2.db"
-# paths default to "db_keys/<pnt_keystore1>.db" when null
-
-client1 = x25519(pnt_keystore, private_keystore_path1)
-client2 = x25519(pnt_keystore1, private_keystore_path2)
-# dk:- shared secret
-dk = client1.agree(client2_public_key, pnt_keystore, enc_key)
-dk1 = client2.agree(client1_public_key, pnt_keystore1, enc_key1)
-
-assert(dk != None)
-assert(dk1 != None)
-
-assert(dk == dk1)
+assert(SK)
+assert(SK1)
+assert(SK == SK1)
 ```
