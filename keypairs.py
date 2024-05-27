@@ -34,6 +34,10 @@ class Keypairs(ABC):
     def get_public_key(self):
         pass
 
+    @abstractmethod
+    def load_keystore():
+        pass
+
     def store(pk, _pk, keystore_path, pnt_keystore, info=b"x25591_key_exchange", salt=None):
         secret_key = secrets.token_bytes(Keypairs.size) # store this
         extended_derived_key = HKDF(algorithm=hashes.SHA256(),
@@ -50,6 +54,7 @@ class Keypairs(ABC):
     def fetch(pnt_keystore, secret_key, keystore_path=None):
         keystore = Keystore(keystore_path, secret_key)
         return keystore.fetch(pnt_keystore)
+    
 
     def __agree__(secret_key, info=b"x25591_key_exchange", salt=None):
         return HKDF(algorithm=hashes.SHA256(), 
@@ -78,6 +83,9 @@ class ecdh(Keypairs):
     def get_public_key(self):
         ppk = Keypairs.fetch(self.pnt_keystore, self.secret_key, self.keystore_path )
         return ppk[0]
+    
+    def load_keystore(self):
+        pass
 
     def agree(self, public_key, info=b"x25591_key_exchange", salt=None) -> bytes:
         if not self.keystore_path:
@@ -114,18 +122,26 @@ class x25519(Keypairs):
         self.secret_key = Keypairs.store(pk, _pk, self.keystore_path, self.pnt_keystore)
         return pk
 
-    def get_public_key(self):
-        ppk = Keypairs.fetch(self.pnt_keystore, self.secret_key, self.keystore_path )
-        return ppk[0]
-
-    def agree(self, public_key, info=b"x25591_key_exchange", salt=None) -> bytes:
+    def load_keystore(self, pnt_keystore: str, secret_key: bytes):
         if not self.keystore_path:
             self.keystore_path = f"db_keys/{pnt_keystore}.db"
+        ppk = Keypairs.fetch(pnt_keystore, secret_key, self.keystore_path )
+        if ppk:
+            self.pnt_keystore = pnt_keystore
+            self.secret_key = secret_key
+
+            return X25519PrivateKey.from_private_bytes(ppk[1])
+
+
+    def get_public_key(self):
         ppk = Keypairs.fetch(self.pnt_keystore, self.secret_key, self.keystore_path )
         if ppk:
-            x = X25519PrivateKey.from_private_bytes(ppk[1])
-            shared_key = x.exchange(X25519PublicKey.from_public_bytes(public_key))
-            return Keypairs.__agree__(shared_key, info, salt)
+            return ppk[0]
+
+    def agree(self, public_key, info=b"x25591_key_exchange", salt=None) -> bytes:
+        x = self.load_keystore(self.pnt_keystore, self.secret_key)
+        shared_key = x.exchange(X25519PublicKey.from_public_bytes(public_key))
+        return Keypairs.__agree__(shared_key, info, salt)
 
 
 if __name__ == "__main__":

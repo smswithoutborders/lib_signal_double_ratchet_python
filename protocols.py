@@ -53,9 +53,11 @@ class DHRatchet:
         state.Nr = 0
 
         state.DHr = header.dh
-        state.RK, state.CKr = KDF_RK(state.RK, DH(state.DHs, state.DHr))
+        shared_secret = DH(state.DHs, state.DHr)
+        state.RK, state.CKr = KDF_RK(state.RK, shared_secret)
         state.DHs = GENERATE_DH(state.DHs.keystore_path)
-        state.RK, state.CKr = KDF_RK(state.RK, DH(state.DHs, state.DHr))
+        shared_secret = DH(state.DHs, state.DHr)
+        state.RK, state.CKs = KDF_RK(state.RK, shared_secret)
 
 
 def GENERATE_DH(keystore_path: str=None) -> bytes:
@@ -97,7 +99,7 @@ def ENCRYPT(mk, plaintext, associated_data) -> bytes:
 def DECRYPT(mk, ciphertext, associated_data):
     # Throws an exception in case cannot verify
     cipher_text = helpers.verify_signature(mk, ciphertext, associated_data)
-    key, _, _ = get_mac_parameters(mk)
+    key, _, _ = helpers.get_mac_parameters(mk)
     iv = cipher_text[:AES.block_size]
     data = cipher_text[AES.block_size:]
     cipher = AES.new(key, AES.MODE_CBC, iv)
