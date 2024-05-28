@@ -39,3 +39,45 @@ assert(SK)
 assert(SK1)
 assert(SK == SK1)
 ```
+
+
+## Double Ratchet Implementations
+- States must be stored
+> `implementation pending`
+
+- Headers can be transmitted by serializing them
+> `transmission_bytes: bytes = headers.serialize()`
+
+```python3
+# perform the above DH handshake and derive an SK
+server_keypair = ...
+
+server_public_key = server_keypair.init()
+
+"""
+[+] Information which should be stored from doing the ratchet include:
+
+- server_keypair.pnt_keystore: str
+
+- server_keypair.secret_key: bytes
+"""
+...
+
+original_plaintext = b"Hello world"
+
+client_state = States()
+server_state = States()
+
+client_key_filepath = "db_keys/alice_keys.db"
+Ratchets.alice_init(client_state, SK, bob_public_key_original, client_key_filepath)
+header, client_ciphertext = Ratchets.encrypt(client_state, original_plaintext, server_public_key)
+
+server_key_filepath = f"db_keys/{client_identification_details}.db"
+server = x25519(server_key_filepath)
+server.load_keystore(server_keypair.pnt_keystore, server_keypair.secret_key)
+
+Ratchets.bob_init(server_state, SK1, server)
+server_plaintext = Ratchets.decrypt(server_state, header, client_ciphertext, bob_public_key_original)
+
+assert(original_plaintext == server_plaintext)
+```
