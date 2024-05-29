@@ -13,7 +13,7 @@ import binascii
 import base64
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
-from keystore import Keystore
+from smswithoutborders_libsig.keystore import Keystore
 
 import base64
 import secrets

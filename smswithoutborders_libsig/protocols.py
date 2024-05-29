@@ -1,4 +1,4 @@
-from keypairs import Keypairs, x25519
+from smswithoutborders_libsig.keypairs import Keypairs, x25519
 
 from Crypto.Protocol.KDF import HKDF
 from Crypto.Random import get_random_bytes
@@ -8,7 +8,7 @@ from Crypto.Util.Padding import pad, unpad
 
 import logging
 import struct
-import helpers
+import smswithoutborders_libsig.helpers as helpers
 
 class States:
     DHs: Keypairs = None

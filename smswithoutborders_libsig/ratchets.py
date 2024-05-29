@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
-from protocols import (
+from smswithoutborders_libsig.protocols import (
     States, 
     HEADERS, 
     GENERATE_DH, 
@@ -14,7 +14,7 @@ from protocols import (
     DHRatchet
 )
 
-from keypairs import Keypairs
+from smswithoutborders_libsig.keypairs import Keypairs
 
 class Ratchets:
     MAX_SKIP = 20
@@ -77,7 +77,7 @@ class Ratchets:
                 state.Nr += 1
 
 if __name__ == "__main__":
-    from keypairs import x25519
+    from smswithoutborders_libsig.keypairs import x25519
 
     alice = x25519()
     alice_public_key_original = alice.init()
