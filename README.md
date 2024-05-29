@@ -8,7 +8,10 @@ pip3 install -r requirements.txt
 
 <br>
 
-> Install if planning to use `pysqlcipher3`
+> [!NOTE]
+>
+> If you plan to use `pysqlcipher3`, you'll need to install additional system
+> dependencies.
 
 **Arch**
 
@@ -24,6 +27,15 @@ sudo apt install build-essential git cmake libsqlite3-dev
 sudo apt install sqlcipher
 ```
 
+> [!TIP]
+>
+> You can install these system dependencies automatically using the
+> `install_system_deps.py` script.
+
+```bash
+python install_system_deps.py
+```
+
 ## Installing the Package via Pip
 
 ```bash
@@ -32,7 +44,7 @@ pip install "git+https://github.com/smswithoutborders/lib_signal_double_ratchet_
 
 ## DH Key exchanges Examples
 
-```python3
+```python
 from smswithoutborders_libsig.keypairs import x25519
 
 alice = x25519()
@@ -65,7 +77,7 @@ assert(SK == SK1)
 - Headers can be transmitted by serializing them
   > `transmission_bytes: bytes = headers.serialize()`
 
-```python3
+```python
 # perform the above DH handshake and derive an SK
 server_keypair = ...
 
