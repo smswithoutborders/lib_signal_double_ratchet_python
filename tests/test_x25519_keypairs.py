@@ -84,3 +84,48 @@ def test_invalid_key_agreement(keypair_paths):
 
     with pytest.raises(ValueError):
         bob.agree(b"invalid_key")
+
+
+def test_keypair_reinitialization(keypair_paths):
+    """Test the reinitialization of the x25519 object with existing keys.
+
+    Ensures that x25519 objects can be reinitialized using the same database
+    paths and secret keys, and that the key agreement process remains functional.
+    """
+    alice_db_path, bob_db_path = keypair_paths
+
+    alice = x25519(alice_db_path)
+    bob = x25519(bob_db_path)
+
+    alice_public_key = alice.init()
+    bob_public_key = bob.init()
+
+    alice_pnt_keystore = alice.pnt_keystore
+    alice_secret_key = alice.secret_key
+    bob_pnt_keystore = bob.pnt_keystore
+    bob_secret_key = bob.secret_key
+
+    del alice
+    del bob
+
+    alice = x25519(
+        pnt_keystore=alice_pnt_keystore,
+        keystore_path=alice_db_path,
+        secret_key=alice_secret_key,
+    )
+    bob = x25519(
+        pnt_keystore=bob_pnt_keystore,
+        keystore_path=bob_db_path,
+        secret_key=bob_secret_key,
+    )
+
+    alice_shared_key = alice.agree(bob_public_key)
+    bob_shared_key = bob.agree(alice_public_key)
+
+    assert alice_shared_key is not None
+    assert bob_shared_key is not None
+    assert isinstance(alice_shared_key, bytes)
+    assert isinstance(bob_shared_key, bytes)
+    assert len(alice_shared_key) == 32
+    assert len(bob_shared_key) == 32
+    assert alice_shared_key == bob_shared_key
