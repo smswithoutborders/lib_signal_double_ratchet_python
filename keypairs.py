@@ -101,8 +101,10 @@ class ecdh(Keypairs):
 
 
 class x25519(Keypairs):
-    def __init__(self, keystore_path=None):
+    def __init__(self, keystore_path=None, pnt_keystore=None, secret_key=None):
         self.keystore_path = keystore_path
+        self.pnt_keystore = pnt_keystore
+        self.secret_key = secret_key
 
     def init(self):
         x = X25519PrivateKey.generate()
