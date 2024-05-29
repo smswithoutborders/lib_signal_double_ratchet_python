@@ -5,26 +5,35 @@
 ```bash
 pip3 install -r requirements.txt
 ```
+
 <br>
 
 > Install if planning to use `pysqlcipher3`
 
 **Arch**
+
 ```bash
 sudo pacman -S sqlcipher
 ```
 
 **Ubuntu**
+
 ```bash
 sudo apt-get install libsqlcipher-dev
 sudo apt install build-essential git cmake libsqlite3-dev
 sudo apt install sqlcipher
 ```
 
+## Installing the Package via Pip
+
+```bash
+pip install "git+https://github.com/smswithoutborders/lib_signal_double_ratchet_python.git@main#egg=smswithoutborders_libsig"
+```
 
 ## DH Key exchanges Examples
+
 ```python3
-from keypairs import x25519
+from smswithoutborders_libsig.keypairs import x25519
 
 alice = x25519()
 alice_public_key_original = alice.init()
@@ -47,13 +56,14 @@ assert(SK1)
 assert(SK == SK1)
 ```
 
-
 ## Double Ratchet Implementations
+
 - States must be stored
-> `implementation pending`
+
+  > `implementation pending`
 
 - Headers can be transmitted by serializing them
-> `transmission_bytes: bytes = headers.serialize()`
+  > `transmission_bytes: bytes = headers.serialize()`
 
 ```python3
 # perform the above DH handshake and derive an SK
