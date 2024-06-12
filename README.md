@@ -50,7 +50,11 @@ assert(SK == SK1)
 
 ## Double Ratchet Implementations
 - States must be stored
-> `implementation pending`
+```python3
+ss: bytes = states.serialize()
+...
+states: States = States.deserialize(ss)
+```
 
 - Headers can be transmitted by serializing them
 > `transmission_bytes: bytes = headers.serialize()`
