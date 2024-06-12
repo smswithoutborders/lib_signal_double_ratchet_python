@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from keypairs import Keypairs, x25519
 
 from Crypto.Protocol.KDF import HKDF
@@ -24,6 +25,12 @@ class States:
     PN = 0
 
     MKSKIPPED = {}
+
+    def serialize(self) -> bytes:
+        pass
+
+    def deserialize(self, data) -> bytes:
+        pass
 
 
 class HEADERS:
@@ -108,3 +115,12 @@ def DECRYPT(mk, ciphertext, associated_data):
 def CONCAT(ad: bytes, header: HEADERS):
     ex_len = struct.pack("<i", len(ad))
     return ex_len + ad + header.serialize()
+
+
+if __name__ == "__main__":
+    state = States()
+
+    s_state = state.serialize()
+    state1 = States.derialize(s_states)
+
+    assert(s_state == state)
