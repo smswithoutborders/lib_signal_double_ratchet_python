@@ -109,3 +109,20 @@ if __name__ == "__main__":
     bob_plaintext = Ratchets.decrypt(bob_state, header, alice_ciphertext, bob_public_key_original)
 
     assert(original_plaintext == bob_plaintext)
+
+    '''test if states serialization happens'''
+    ss_alice = alice_state.serialize()
+    
+    ds_alice = States.deserialize(ss_alice)
+    assert(ds_alice.Ns == alice_state.Ns)
+    assert(ds_alice.Nr == alice_state.Nr)
+    assert(ds_alice.PN == alice_state.PN)
+    assert(ds_alice.MKSKIPPED == alice_state.MKSKIPPED)
+    assert(ds_alice.CKr == alice_state.CKr)
+    assert(ds_alice.CKs == alice_state.CKs)
+    assert(ds_alice.DHr == alice_state.DHr)
+    assert(ds_alice.DHs == alice_state.DHs)
+    assert(ds_alice.DHs.pnt_keystore == alice_state.DHs.pnt_keystore)
+    assert(ds_alice.DHs.keystore_path == alice_state.DHs.keystore_path)
+    assert(ds_alice.DHs.secret_key == alice_state.DHs.secret_key)
+    assert(ds_alice == alice_state)
