@@ -10,6 +10,8 @@ from Crypto.Util.Padding import pad, unpad
 import logging
 import struct
 import helpers
+import struct
+import pickle
 
 class States:
     DHs: Keypairs = None
@@ -27,11 +29,63 @@ class States:
     MKSKIPPED = {}
 
     def serialize(self) -> bytes:
-        pass
+        if not hasattr(self, 'DHs') or self.DHs == None or \
+                not hasattr(self, 'RK') or self.RK == None: 
+                    raise Exception("State cannot be serialized: reason DHs == None or RK == None")
 
-    def deserialize(self, data) -> bytes:
-        pass
+        s_keypairs = self.DHs.serialize()
 
+        s_keypairs_len = len(s_keypairs)
+        dhr_len  = len(self.DHr) if not self.DHr is None else 0
+        rk_len = len(self.RK) if not self.RK is None else 0
+        ck_len  = len(self.CKs) if not self.CKs is None else 0
+        cr_len  = len(self.CKr) if not self.CKr is None else 0
+
+        len_start = struct.pack(f"<{'i'*5}", s_keypairs_len, rk_len, dhr_len, ck_len, cr_len)
+        _serialized = len_start + s_keypairs + self.RK
+        for i in [self.DHr, self.CKs, self.CKr]:
+            if i: 
+                _serialized = _serialized + i
+        _serialized = _serialized + struct.pack("<iii", self.Ns, self.Nr, self.PN) + \
+                pickle.dumps(self.MKSKIPPED)
+        return _serialized
+
+    @staticmethod
+    def deserialize(data):
+        state = States()
+
+        s_keypairs_len, dhr_len, rk_len, cks_len, ckr_len = \
+                struct.unpack(f"<{'i'*5}", data[0:4*5])
+
+        data = data[4*5:]
+
+        state.DHs = x25519().deserialize(data[:s_keypairs_len])
+        state.RK = data[s_keypairs_len: (s_keypairs_len + rk_len)]
+        state.DHr = data[(s_keypairs_len + rk_len): (s_keypairs_len + dhr_len + rk_len)]
+        state.CKs = data[(s_keypairs_len + dhr_len + rk_len): (s_keypairs_len + dhr_len + rk_len + cks_len)]
+        if state.CKs == b'':
+            state.CKs = None
+        state.CKr = data[(s_keypairs_len + dhr_len + rk_len + cks_len): (s_keypairs_len + dhr_len + \
+                rk_len + cks_len + ckr_len)]
+        if state.CKr == b'':
+            state.CKr = None
+        state.Ns, state.Nr, state.PN = \
+                struct.unpack("<iii", 
+                              data[(s_keypairs_len + dhr_len + rk_len + cks_len + ckr_len): 
+                                   (s_keypairs_len + dhr_len + rk_len + cks_len + ckr_len + 3*4)])
+        state.MKSKIPPED = pickle.loads(data[(s_keypairs_len + dhr_len + rk_len + cks_len + ckr_len + 3*4):])
+
+        return state
+
+    def __eq__(self, other):
+        if not isinstance(other, States):
+            return NotImplemented
+
+        return (self.DHs == other.DHs and self.DHr == other.DHr 
+                and self.RK == other.RK and self.CKs == other.CKs
+                and self.CKr == other.CKr and self.Ns == other.Ns
+                and self.Nr == other.Nr and self.PN == other.PN
+                and self.MKSKIPPED == other.MKSKIPPED)
 
 class HEADERS:
     dh: bytes # public key bytes
@@ -88,6 +142,7 @@ def KDF_RK(rk, dh_out):
                  hashmod=SHA512, 
                  num_keys=num_keys, context=information)
 
+
 def KDF_CK(ck):
     d_ck = HMAC.new(ck, digestmod=SHA256)
     ck = d_ck.update(b'\x01').digest()
@@ -96,12 +151,14 @@ def KDF_CK(ck):
     mk = d_ck.update(b'\x02').digest()
     return ck, mk
 
+
 def ENCRYPT(mk, plaintext, associated_data) -> bytes:
     key, auth_key, iv = helpers.get_mac_parameters(mk)
     cipher = AES.new(key, AES.MODE_CBC, iv)
     cipher_text = iv + cipher.encrypt(pad(plaintext,  AES.block_size))
     hmac = helpers.build_verification_hash(auth_key, associated_data, cipher_text)
     return cipher_text + hmac.digest()
+
 
 def DECRYPT(mk, ciphertext, associated_data):
     # Throws an exception in case cannot verify
@@ -112,15 +169,7 @@ def DECRYPT(mk, ciphertext, associated_data):
     cipher = AES.new(key, AES.MODE_CBC, iv)
     return unpad(cipher.decrypt(data), AES.block_size)
 
+
 def CONCAT(ad: bytes, header: HEADERS):
     ex_len = struct.pack("<i", len(ad))
     return ex_len + ad + header.serialize()
-
-
-if __name__ == "__main__":
-    state = States()
-
-    s_state = state.serialize()
-    state1 = States.derialize(s_states)
-
-    assert(s_state == state)

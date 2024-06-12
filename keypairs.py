@@ -36,11 +36,15 @@ class Keypairs(ABC):
         pass
 
     @abstractmethod
-    def load_keystore():
+    def load_keystore(self):
         pass
 
     @abstractmethod
-    def serialize():
+    def serialize(self):
+        pass
+
+    @abstractmethod
+    def deserialize(self):
         pass
 
     def store(pk, _pk, keystore_path, pnt_keystore, info=b"x25591_key_exchange", salt=None):
@@ -141,8 +145,7 @@ class x25519(Keypairs):
                 self.keystore_path.encode() + \
                 self.pnt_keystore.encode() + self.secret_key.encode()
 
-    @staticmethod
-    def deserialize(data) -> Keypairs:
+    def deserialize(self, data) -> Keypairs:
         """
         """
         x = x25519()
