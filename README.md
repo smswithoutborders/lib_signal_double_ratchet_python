@@ -71,15 +71,18 @@ assert(SK == SK1)
 ## Double Ratchet Implementations
 
 - States must be stored
-```python3
+```python
 ss: bytes = states.serialize()
-...
+---
 states: States = States.deserialize(ss)
 ```
 
 - Headers can be transmitted by serializing them
-```python3
+```python
 transmission_bytes: bytes = headers.serialize()
+---
+header = HEADERS(keypair)
+header.deserialize(ratchet_header)
 ```
 
 ```python
@@ -107,7 +110,7 @@ Ratchets.alice_init(client_state, SK, bob_public_key_original, client_key_filepa
 header, client_ciphertext = Ratchets.encrypt(client_state, original_plaintext, server_public_key)
 
 # sample transmission could have
-len_header = len(header)
+len_header = len(header.serialize())
 transmission_text = base64.b64encode(struct.pack("<i", len_header) + header + client_ciphertext)
 
 ...
