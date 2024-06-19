@@ -79,9 +79,10 @@ states: States = States.deserialize(ss)
 - Headers can be transmitted by serializing them
 ```python
 transmission_bytes: bytes = headers.serialize()
+
 ---
-header = HEADERS(keypair)
-header.deserialize(ratchet_header)
+
+header = HEADER.deserialize(transmission_bytes)
 ```
 
 ```python
