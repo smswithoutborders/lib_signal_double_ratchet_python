@@ -24,7 +24,6 @@ sudo pacman -S sqlcipher
 ```bash
 sudo apt-get install libsqlcipher-dev
 sudo apt install build-essential git cmake libsqlite3-dev
-sudo apt install sqlcipher
 ```
 
 > [!TIP]
