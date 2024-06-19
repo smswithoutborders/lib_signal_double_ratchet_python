@@ -19,6 +19,7 @@ class Keystore:
 
     def create(self):
         self.cursor.execute(f"PRAGMA key = '{self.mk}'")
+        self.cursor.execute(f"PRAGMA cipher_compatibility = 3")
         self.cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS {self.table_name} (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,6 +35,7 @@ class Keystore:
         # pk = libsig.ENCRYPT(mk, keypair[0], b"public_key")
         # _pk = libsig.ENCRYPT(mk, keypair[1], b"private_key")
         self.cursor.execute(f"PRAGMA key = '{self.mk}'")
+        self.cursor.execute(f"PRAGMA cipher_compatibility = 3")
         self.cursor.execute(f'INSERT INTO {self.table_name} (pnt, pk, _pk) VALUES (?, ?, ?)', 
                        (pnt, pk, _pk,))
 
@@ -46,6 +48,7 @@ class Keystore:
 
     def fetch(self, pnt):
         self.cursor.execute(f"PRAGMA key = '{self.mk}'")
+        self.cursor.execute(f"PRAGMA cipher_compatibility = 3")
         self.cursor.execute(f'SELECT * FROM {self.table_name} WHERE pnt = ?', (pnt,))
         rows = self.cursor.fetchall()
 

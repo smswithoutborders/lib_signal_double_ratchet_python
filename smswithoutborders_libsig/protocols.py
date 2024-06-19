@@ -115,13 +115,13 @@ class DHRatchet:
         state.DHr = header.dh
         shared_secret = DH(state.DHs, state.DHr)
         state.RK, state.CKr = KDF_RK(state.RK, shared_secret)
-        state.DHs = GENERATE_DH(state.DHs.keystore_path)
+        state.DHs = GENERATE_DH(state.DHs.keystore_path, state.DHs.secret_key)
         shared_secret = DH(state.DHs, state.DHr)
         state.RK, state.CKs = KDF_RK(state.RK, shared_secret)
 
 
-def GENERATE_DH(keystore_path: str=None) -> bytes:
-    x = x25519(keystore_path=keystore_path)
+def GENERATE_DH(keystore_path: str=None, secret_key = None) -> bytes:
+    x = x25519(keystore_path=keystore_path, secret_key=secret_key)
     x.init()
     return x
 
