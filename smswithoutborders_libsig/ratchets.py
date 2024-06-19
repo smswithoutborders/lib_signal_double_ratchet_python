@@ -103,6 +103,10 @@ if __name__ == "__main__":
     header, alice_ciphertext = Ratchets.encrypt(
         alice_state, original_plaintext, bob_public_key_original)
 
+    s_header = header.serialize()
+    a_header1 = HEADERS.deserialize(s_header)
+    assert(header == a_header1)
+
     bob1 = x25519("db_keys/bobs_keys.db")
     bob1.load_keystore(bob.pnt_keystore, bob.secret_key)
     Ratchets.bob_init(bob_state, SK1, bob1)

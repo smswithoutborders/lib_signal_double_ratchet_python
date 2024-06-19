@@ -93,18 +93,33 @@ class HEADERS:
     
     LEN = None
     
-    def __init__(self, dh: Keypairs=None, pn=None, n=None):
-        self.dh = dh.get_public_key()
+    def __init__(self, dh_pair: bytes=None, pn=None, n=None):
+        if dh_pair:
+            self.dh = dh_pair.get_public_key()
         self.pn = pn
         self.n = n
 
     def serialize(self) -> bytes:
         return struct.pack("<ii", self.pn, self.n) + self.dh
 
+    """
     def deserialize(self, data):
         self.pn, self.n = struct.unpack("<ii", data[0:8])
         self.dh = data[12:]
+    """
 
+    @staticmethod
+    def deserialize(data):
+        pn, n = struct.unpack("<ii", data[0:8])
+        headers = HEADERS(pn=pn, n=n)
+        headers.dh = data[8:]
+
+        return headers
+
+    def __eq__(self, other):
+        return (self.dh == other.dh and 
+                self.pn == other.pn and
+                self.n == other.n)
 
 class DHRatchet:
     def __init__(self, state: States, header: HEADERS):
