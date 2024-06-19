@@ -114,8 +114,6 @@ if __name__ == "__main__":
     assert(bob.secret_key == bob_state.DHs.secret_key)
     assert(bob1.secret_key == bob_state.DHs.secret_key)
 
-    print(bob_state.serialize())
-
     bob_plaintext = Ratchets.decrypt(bob_state, header, alice_ciphertext, bob_public_key_original)
 
     assert(original_plaintext == bob_plaintext)
