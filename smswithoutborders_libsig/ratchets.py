@@ -94,7 +94,7 @@ if __name__ == "__main__":
 
     # .... assuming in change in time 
 
-    original_plaintext = b"Hello world"
+    original_plaintext = b"Hello world"*32
 
     alice_state = States()
     bob_state = States()
