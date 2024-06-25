@@ -93,18 +93,33 @@ class HEADERS:
     
     LEN = None
     
-    def __init__(self, dh: Keypairs=None, pn=None, n=None):
-        self.dh = dh.get_public_key()
+    def __init__(self, dh_pair: bytes=None, pn=None, n=None):
+        if dh_pair:
+            self.dh = dh_pair.get_public_key()
         self.pn = pn
         self.n = n
 
     def serialize(self) -> bytes:
         return struct.pack("<ii", self.pn, self.n) + self.dh
 
+    """
     def deserialize(self, data):
         self.pn, self.n = struct.unpack("<ii", data[0:8])
         self.dh = data[12:]
+    """
 
+    @staticmethod
+    def deserialize(data):
+        pn, n = struct.unpack("<ii", data[0:8])
+        headers = HEADERS(pn=pn, n=n)
+        headers.dh = data[8:]
+
+        return headers
+
+    def __eq__(self, other):
+        return (self.dh == other.dh and 
+                self.pn == other.pn and
+                self.n == other.n)
 
 class DHRatchet:
     def __init__(self, state: States, header: HEADERS):
@@ -115,13 +130,13 @@ class DHRatchet:
         state.DHr = header.dh
         shared_secret = DH(state.DHs, state.DHr)
         state.RK, state.CKr = KDF_RK(state.RK, shared_secret)
-        state.DHs = GENERATE_DH(state.DHs.keystore_path)
+        state.DHs = GENERATE_DH(state.DHs.keystore_path, state.DHs.secret_key)
         shared_secret = DH(state.DHs, state.DHr)
         state.RK, state.CKs = KDF_RK(state.RK, shared_secret)
 
 
-def GENERATE_DH(keystore_path: str=None) -> bytes:
-    x = x25519(keystore_path=keystore_path)
+def GENERATE_DH(keystore_path: str=None, secret_key = None) -> bytes:
+    x = x25519(keystore_path=keystore_path, secret_key=secret_key)
     x.init()
     return x
 

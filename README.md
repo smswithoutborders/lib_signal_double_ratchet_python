@@ -24,7 +24,6 @@ sudo pacman -S sqlcipher
 ```bash
 sudo apt-get install libsqlcipher-dev
 sudo apt install build-essential git cmake libsqlite3-dev
-sudo apt install sqlcipher
 ```
 
 > [!TIP]
@@ -71,15 +70,19 @@ assert(SK == SK1)
 ## Double Ratchet Implementations
 
 - States must be stored
-```python3
+```python
 ss: bytes = states.serialize()
-...
+---
 states: States = States.deserialize(ss)
 ```
 
 - Headers can be transmitted by serializing them
-```python3
+```python
 transmission_bytes: bytes = headers.serialize()
+
+---
+
+header = HEADER.deserialize(transmission_bytes)
 ```
 
 ```python
@@ -105,6 +108,12 @@ server_state = States()
 client_key_filepath = "db_keys/alice_keys.db"
 Ratchets.alice_init(client_state, SK, bob_public_key_original, client_key_filepath)
 header, client_ciphertext = Ratchets.encrypt(client_state, original_plaintext, server_public_key)
+
+# sample transmission could have
+len_header = len(header.serialize())
+transmission_text = base64.b64encode(struct.pack("<i", len_header) + header + client_ciphertext)
+
+...
 
 server_key_filepath = f"db_keys/{client_identification_details}.db"
 server = x25519(server_key_filepath)

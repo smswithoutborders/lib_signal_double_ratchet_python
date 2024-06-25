@@ -47,13 +47,15 @@ class Keypairs(ABC):
     def deserialize(self):
         pass
 
-    def store(pk, _pk, keystore_path, pnt_keystore, info=b"x25591_key_exchange", salt=None):
-        secret_key = secrets.token_bytes(Keypairs.size) # store this
-        extended_derived_key = HKDF(algorithm=hashes.SHA256(),
-                           length=Keypairs.size,
-                           salt=salt,
-                           info=info,).derive(secret_key)
-        secret_key = base64.b64encode(extended_derived_key).decode()
+    def store(pk, _pk, keystore_path, pnt_keystore, info=b"x25591_key_exchange", 
+            salt=None, secret_key=None):
+        if not secret_key:
+            secret_key = secrets.token_bytes(Keypairs.size) # store this
+            extended_derived_key = HKDF(algorithm=hashes.SHA256(),
+                               length=Keypairs.size,
+                               salt=salt,
+                               info=info,).derive(secret_key)
+            secret_key = base64.b64encode(extended_derived_key).decode()
 
         keystore = Keystore(keystore_path, secret_key)
         keystore.store(keypair=(pk, _pk), pnt=pnt_keystore)
@@ -130,7 +132,8 @@ class x25519(Keypairs):
         if not self.keystore_path:
             self.keystore_path = f"db_keys/{self.pnt_keystore}.db"
 
-        self.secret_key = Keypairs.store(pk, _pk, self.keystore_path, self.pnt_keystore)
+        self.secret_key = Keypairs.store(pk, _pk, self.keystore_path, 
+                self.pnt_keystore, secret_key=self.secret_key)
         return pk
 
     def serialize(self) -> bytes:

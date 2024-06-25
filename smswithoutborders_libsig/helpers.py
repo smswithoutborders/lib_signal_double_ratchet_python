@@ -30,7 +30,7 @@ def verify_signature(mk, cipher_text_mac, associated_data):
     """ 
     _, auth_key, _ = get_mac_parameters(mk)
     mac = cipher_text_mac[len(cipher_text_mac) - SHA256.digest_size:]
-    cipher_text = cipher_text_mac[:SHA256.digest_size]
+    cipher_text = cipher_text_mac[:len(cipher_text_mac) - SHA256.digest_size]
     hmac = build_verification_hash(auth_key, associated_data, cipher_text)
     hmac.verify(mac)
     return cipher_text

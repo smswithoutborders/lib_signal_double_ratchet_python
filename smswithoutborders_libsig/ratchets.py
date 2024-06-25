@@ -94,7 +94,7 @@ if __name__ == "__main__":
 
     # .... assuming in change in time 
 
-    original_plaintext = b"Hello world"
+    original_plaintext = b"Hello world"*32
 
     alice_state = States()
     bob_state = States()
@@ -103,9 +103,21 @@ if __name__ == "__main__":
     header, alice_ciphertext = Ratchets.encrypt(
         alice_state, original_plaintext, bob_public_key_original)
 
+    s_header = header.serialize()
+    a_header1 = HEADERS.deserialize(s_header)
+    assert(header == a_header1)
+
     bob1 = x25519("db_keys/bobs_keys.db")
     bob1.load_keystore(bob.pnt_keystore, bob.secret_key)
     Ratchets.bob_init(bob_state, SK1, bob1)
+
+    assert(bob.secret_key == bob1.secret_key)
+    assert(bob.keystore_path == bob1.keystore_path)
+    assert(bob.pnt_keystore == bob1.pnt_keystore)
+
+    assert(bob.secret_key == bob_state.DHs.secret_key)
+    assert(bob1.secret_key == bob_state.DHs.secret_key)
+
     bob_plaintext = Ratchets.decrypt(bob_state, header, alice_ciphertext, bob_public_key_original)
 
     assert(original_plaintext == bob_plaintext)
