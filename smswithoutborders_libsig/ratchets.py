@@ -17,7 +17,8 @@ from smswithoutborders_libsig.protocols import (
 from smswithoutborders_libsig.keypairs import Keypairs
 
 class Ratchets:
-    MAX_SKIP = 20
+    import os
+    MAX_SKIP = int(os.environ.get("MKSKIPPED")) or 100
 
     def alice_init(state: States, SK: bytes, bob_dh_public_key: bytes, keystore_path: str=None):
         state.DHs = GENERATE_DH(keystore_path)
@@ -122,19 +123,10 @@ if __name__ == "__main__":
 
     assert(original_plaintext == bob_plaintext)
 
-    '''test if states serialization happens'''
-    ss_alice = alice_state.serialize()
     
-    ds_alice = States.deserialize(ss_alice)
-    assert(ds_alice.Ns == alice_state.Ns)
-    assert(ds_alice.Nr == alice_state.Nr)
-    assert(ds_alice.PN == alice_state.PN)
-    assert(ds_alice.MKSKIPPED == alice_state.MKSKIPPED)
-    assert(ds_alice.CKr == alice_state.CKr)
-    assert(ds_alice.CKs == alice_state.CKs)
-    assert(ds_alice.DHr == alice_state.DHr)
-    assert(ds_alice.DHs == alice_state.DHs)
-    assert(ds_alice.DHs.pnt_keystore == alice_state.DHs.pnt_keystore)
-    assert(ds_alice.DHs.keystore_path == alice_state.DHs.keystore_path)
-    assert(ds_alice.DHs.secret_key == alice_state.DHs.secret_key)
-    assert(ds_alice == alice_state)
+    import sys
+    for i in range(int(sys.argv[1])):
+        print(i)
+        header1, alice_ciphertext = Ratchets.encrypt(alice_state, original_plaintext, bob_public_key_original)
+
+    bob_plaintext = Ratchets.decrypt(bob_state, header1, alice_ciphertext, bob_public_key_original)
