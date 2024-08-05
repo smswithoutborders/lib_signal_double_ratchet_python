@@ -170,17 +170,18 @@ if __name__ == "__main__":
     print(base64.b64encode(bob_public_key_original))
 
     alice = x25519()
+    alice_public_key_original = alice.init()
+    """
     alice_public_key_original = input("alice pubkey: ")
     alice_public_key_original = base64.b64decode(alice_public_key_original.encode())
+    """
 
-    # SK = alice.agree(bob_public_key_original)
+    SK = alice.agree(bob_public_key_original)
     SK1 = bob.agree(alice_public_key_original)
-    print(SK1)
-    print(base64.b64encode(SK1))
+    assert SK == SK1
 
     # .... assuming in change in time
 
-    """
     original_plaintext = b"Hello world" * 32
 
     alice_state = States()
@@ -196,25 +197,20 @@ if __name__ == "__main__":
     a_header1 = HEADERS.deserialize(s_header)
     assert header == a_header1
 
-    bob1 = x25519("db_keys/bobs_keys.db")
-    bob1.load_keystore(bob.pnt_keystore, bob.secret_key)
-    Ratchets.bob_init(bob_state, SK1, bob1)
-    """
-
     bob_state = States()
-    """
     bob1 = x25519("db_keys/bobs_keys.db")
     bob1.load_keystore(bob.pnt_keystore, bob.secret_key)
     Ratchets.bob_init(bob_state, SK1, bob1)
+
     """
     Ratchets.bob_init(bob_state, SK1, bob)
-
     alice_ciphertext = input("ciphertext:")
     alice_ciphertext = base64.b64decode(alice_ciphertext)
     header = HEADERS.deserialize(alice_ciphertext[4:4+struct.unpack("<i", alice_ciphertext[:4])[0]])
     alice_ciphertext = alice_ciphertext[4+struct.unpack("<i", alice_ciphertext[:4])[0]:]
     print("header: ", base64.b64encode(header.serialize()))
     print("alice ciphertext: ", base64.b64encode(alice_ciphertext))
+    """
 
     bob_plaintext = Ratchets.decrypt(
         state=bob_state,
