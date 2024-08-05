@@ -11,6 +11,7 @@ import logging
 import struct
 import smswithoutborders_libsig.helpers as helpers
 import pickle
+import base64
 
 class States:
     DHs: Keypairs = None
@@ -159,11 +160,11 @@ def KDF_RK(rk, dh_out):
 
 def KDF_CK(ck):
     d_ck = HMAC.new(ck, digestmod=SHA256)
-    ck = d_ck.update(b'\x01').digest()
+    _ck = d_ck.update(b'\x01').digest()
 
     d_ck = HMAC.new(ck, digestmod=SHA256)
     mk = d_ck.update(b'\x02').digest()
-    return ck, mk
+    return _ck, mk
 
 
 def ENCRYPT(mk, plaintext, associated_data) -> bytes:
@@ -177,13 +178,14 @@ def ENCRYPT(mk, plaintext, associated_data) -> bytes:
 def DECRYPT(mk, ciphertext, associated_data):
     # Throws an exception in case cannot verify
     cipher_text = helpers.verify_signature(mk, ciphertext, associated_data)
-    key, _, _ = helpers.get_mac_parameters(mk)
-    iv = cipher_text[:AES.block_size]
-    data = cipher_text[AES.block_size:]
+    key, _, iv = helpers.get_mac_parameters(mk)
+    # iv = cipher_text[:AES.block_size]
+    # data = cipher_text[AES.block_size:]
     cipher = AES.new(key, AES.MODE_CBC, iv)
-    return unpad(cipher.decrypt(data), AES.block_size)
+    return unpad(cipher.decrypt(cipher_text), AES.block_size)
 
 
 def CONCAT(ad: bytes, header: HEADERS):
-    ex_len = struct.pack("<i", len(ad))
-    return ex_len + ad + header.serialize()
+    # ex_len = struct.pack("<i", len(ad))
+    # return ex_len + ad + header.serialize()
+    return ad + header.serialize()
