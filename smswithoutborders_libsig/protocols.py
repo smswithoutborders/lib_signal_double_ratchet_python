@@ -170,7 +170,7 @@ def KDF_CK(ck):
 def ENCRYPT(mk, plaintext, associated_data) -> bytes:
     key, auth_key, iv = helpers.get_mac_parameters(mk)
     cipher = AES.new(key, AES.MODE_CBC, iv)
-    cipher_text = iv + cipher.encrypt(pad(plaintext,  AES.block_size))
+    cipher_text = cipher.encrypt(pad(plaintext,  AES.block_size))
     hmac = helpers.build_verification_hash(auth_key, associated_data, cipher_text)
     return cipher_text + hmac.digest()
 
