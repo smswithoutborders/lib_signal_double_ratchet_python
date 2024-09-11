@@ -1,4 +1,5 @@
 
+import base64
 from Crypto.Hash import SHA512, SHA256, HMAC
 from Crypto.Protocol.KDF import HKDF
 
