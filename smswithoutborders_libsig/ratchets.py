@@ -1,5 +1,5 @@
 """
-A module for managing a secure keystore.
+A module that implements the ratchet mechanism.
  
 This program is free software: you can redistribute it under the terms
 of the GNU General Public License, v. 3.0. If a copy of the GNU General
