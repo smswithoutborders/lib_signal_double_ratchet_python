@@ -16,7 +16,7 @@ from smswithoutborders_libsig.protocols import (
     DHRatchet,
 )
 
-from smswithoutborders_libsig.keypairs import Keypairs, x25519
+from smswithoutborders_libsig.keypairs import x25519
 
 
 class Ratchets:
@@ -52,7 +52,7 @@ class Ratchets:
         state.MKSKIPPED = {}
 
     @staticmethod
-    def bob_init(state: States, SK: bytes, bob_dh_key_pair: Keypairs):
+    def bob_init(state: States, SK: bytes, bob_dh_key_pair: x25519):
         """
         Initializes the state for Bob.
 

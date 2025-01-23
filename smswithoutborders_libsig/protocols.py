@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from smswithoutborders_libsig.keypairs import Keypairs, x25519
+from smswithoutborders_libsig.keypairs import x25519
 
 from Crypto.Protocol.KDF import HKDF
 from Crypto.Random import get_random_bytes
@@ -15,7 +15,7 @@ import pickle
 import base64
 
 class States:
-    DHs: Keypairs = None
+    DHs: x25519 = None
     DHr: bytes = None
 
     RK: bytes = None
@@ -142,7 +142,7 @@ def GENERATE_DH(keystore_path: str=None, secret_key = None) -> bytes:
     x.init()
     return x
 
-def DH(dh_pair: Keypairs, dh_pub: bytes) -> bytes:
+def DH(dh_pair: x25519, dh_pub: bytes) -> bytes:
     return dh_pair.agree(dh_pub)
 
 def KDF_RK(rk, dh_out): 
