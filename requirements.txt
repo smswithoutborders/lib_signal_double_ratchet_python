@@ -1,5 +1,5 @@
 cffi==1.17.1
-cryptography==44.0.2
+cryptography==44.0.3
 ecdsa==0.19.1
 pycparser==2.22
 pycryptodome==3.22.0
