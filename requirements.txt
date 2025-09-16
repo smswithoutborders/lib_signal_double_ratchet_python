@@ -1,7 +1,7 @@
 cffi==2.0.0
 cryptography==45.0.6
 ecdsa==0.19.1
-pycparser==2.22
+pycparser==2.23
 pycryptodome==3.23.0
 six==1.17.0
 sqlcipher3==0.5.4
