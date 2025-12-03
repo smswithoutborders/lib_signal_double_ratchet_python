@@ -1,6 +1,5 @@
 cffi==2.0.0
 cryptography==46.0.3
-ecdsa==0.19.1
 pycparser==2.23
 pycryptodome==3.23.0
 six==1.17.0

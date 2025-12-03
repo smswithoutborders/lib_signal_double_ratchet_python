@@ -12,7 +12,6 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import (
     X25519PublicKey,
 )
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from ecdsa import ECDH, NIST256p
 
 from smswithoutborders_libsig.keystore import Keystore
 
@@ -79,47 +78,6 @@ class Keypairs(ABC):
             salt=salt,
             info=info,
         ).derive(secret_key)
-
-
-class ecdh(Keypairs):
-    def __init__(self, pnt_keystore=None, keystore_path=None, secret_key=None):
-        self.pnt_keystore = pnt_keystore
-        self.keystore_path = keystore_path
-
-    def init(self):
-        ecdh = ECDH(curve=NIST256p)
-        pk = ecdh.generate_private_key()
-        self.pnt_keystore = uuid.uuid4().hex
-
-        if not self.keystore_path:
-            self.keystore_path = f"db_keys/{self.pnt_keystore}.db"
-
-        self.secret_key = Keypairs.store(
-            pk.to_string(),
-            ecdh.private_key.to_string(),
-            self.keystore_path,
-            self.pnt_keystore,
-        )
-        return pk.to_string()
-
-    def get_public_key(self):
-        ppk = Keypairs.fetch(self.pnt_keystore, self.secret_key, self.keystore_path)
-        return ppk[0]
-
-    def load_keystore(self):
-        pass
-
-    def agree(self, public_key, info=b"x25591_key_exchange", salt=None) -> bytes:
-        if not self.keystore_path:
-            self.keystore_path = f"db_keys/{pnt_keystore}.db"
-        ppk = Keypairs.fetch(self.pnt_keystore, self.secret_key, self.keystore_path)
-        if ppk:
-            ecdh = ECDH(curve=NIST256p)
-            ecdh.load_private_key_bytes(ppk[1])
-            # ecdh.load_received_public_key_pem(public_key)
-            ecdh.load_received_public_key_bytes(public_key)
-            shared_key = ecdh.generate_sharedsecret_bytes()
-            return Keypairs.__agree__(shared_key, info, salt)
 
 
 class x25519(Keypairs):
