@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 
+import base64
+import json
 import pickle
 import struct
+import warnings
 
 from Crypto.Cipher import AES
 from Crypto.Hash import HMAC, SHA256, SHA512
@@ -29,11 +32,16 @@ class States:
     MKSKIPPED = {}
 
     def serialize(self) -> bytes:
+        warnings.warn(
+            "serialize() is deprecated due to pickle usage. Use serialize_json() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if (
             not hasattr(self, "DHs")
-            or self.DHs == None
+            or self.DHs is None
             or not hasattr(self, "RK")
-            or self.RK == None
+            or self.RK is None
         ):
             raise Exception(
                 "State cannot be serialized: reason DHs == None or RK == None"
@@ -42,10 +50,10 @@ class States:
         s_keypairs = self.DHs.serialize()
 
         s_keypairs_len = len(s_keypairs)
-        dhr_len = len(self.DHr) if not self.DHr is None else 0
-        rk_len = len(self.RK) if not self.RK is None else 0
-        ck_len = len(self.CKs) if not self.CKs is None else 0
-        cr_len = len(self.CKr) if not self.CKr is None else 0
+        dhr_len = len(self.DHr) if self.DHr is not None else 0
+        rk_len = len(self.RK) if self.RK is not None else 0
+        ck_len = len(self.CKs) if self.CKs is not None else 0
+        cr_len = len(self.CKr) if self.CKr is not None else 0
 
         len_start = struct.pack(
             f"<{'i' * 5}", s_keypairs_len, rk_len, dhr_len, ck_len, cr_len
@@ -63,6 +71,11 @@ class States:
 
     @staticmethod
     def deserialize(data):
+        warnings.warn(
+            "deserialize() is deprecated due to pickle usage. Use deserialize_json() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         state = States()
 
         s_keypairs_len, dhr_len, rk_len, cks_len, ckr_len = struct.unpack(
@@ -101,6 +114,71 @@ class States:
         state.MKSKIPPED = pickle.loads(
             data[(s_keypairs_len + dhr_len + rk_len + cks_len + ckr_len + 3 * 4) :]
         )
+
+        return state
+
+    def serialize_json(self) -> bytes:
+        """
+        Serialize state to JSON format
+        Returns bytes containing JSON-encoded state.
+        """
+        if (
+            not hasattr(self, "DHs")
+            or self.DHs is None
+            or not hasattr(self, "RK")
+            or self.RK is None
+        ):
+            raise Exception(
+                "State cannot be serialized: reason DHs == None or RK == None"
+            )
+
+        mkskipped_encoded = {}
+        for (dh_key, n), mk_value in self.MKSKIPPED.items():
+            key_str = f"{base64.b64encode(dh_key).decode('ascii')}:{n}"
+            mkskipped_encoded[key_str] = base64.b64encode(mk_value).decode("ascii")
+
+        state_dict = {
+            "version": 1,
+            "DHs": base64.b64encode(self.DHs.serialize()).decode("ascii"),
+            "DHr": base64.b64encode(self.DHr).decode("ascii") if self.DHr else None,
+            "RK": base64.b64encode(self.RK).decode("ascii"),
+            "CKs": base64.b64encode(self.CKs).decode("ascii") if self.CKs else None,
+            "CKr": base64.b64encode(self.CKr).decode("ascii") if self.CKr else None,
+            "Ns": self.Ns,
+            "Nr": self.Nr,
+            "PN": self.PN,
+            "MKSKIPPED": mkskipped_encoded,
+        }
+
+        return json.dumps(state_dict).encode("utf-8")
+
+    @staticmethod
+    def deserialize_json(data: bytes):
+        """
+        Deserialize state from JSON format.
+        """
+        state = States()
+        state_dict = json.loads(data.decode("utf-8"))
+
+        if state_dict.get("version") != 1:
+            raise ValueError(f"Unsupported state version: {state_dict.get('version')}")
+
+        state.DHs = x25519().deserialize(base64.b64decode(state_dict["DHs"]))
+        state.RK = base64.b64decode(state_dict["RK"])
+        state.DHr = base64.b64decode(state_dict["DHr"]) if state_dict["DHr"] else None
+        state.CKs = base64.b64decode(state_dict["CKs"]) if state_dict["CKs"] else None
+        state.CKr = base64.b64decode(state_dict["CKr"]) if state_dict["CKr"] else None
+        state.Ns = state_dict["Ns"]
+        state.Nr = state_dict["Nr"]
+        state.PN = state_dict["PN"]
+
+        state.MKSKIPPED = {}
+        for key_str, mk_value_encoded in state_dict["MKSKIPPED"].items():
+            dh_b64, n_str = key_str.rsplit(":", 1)
+            dh_key = base64.b64decode(dh_b64)
+            n = int(n_str)
+            mk_value = base64.b64decode(mk_value_encoded)
+            state.MKSKIPPED[(dh_key, n)] = mk_value
 
         return state
 
