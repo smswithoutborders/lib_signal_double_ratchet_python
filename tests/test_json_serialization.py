@@ -1,14 +1,15 @@
-#!/usr/bin/env python3
-
 import os
 import secrets
+
 import pytest
-from smswithoutborders_libsig.protocols import States
+
 from smswithoutborders_libsig.keypairs import x25519
+from smswithoutborders_libsig.protocols import States
+from tests.test_helpers import states_equal
 
 
 class TestJSONSerialization:
-    """Test JSON-based serialization as a safer alternative to pickle"""
+    """Test JSON-based serialization."""
 
     def setup_method(self):
         """Setup test fixtures"""
@@ -52,7 +53,7 @@ class TestJSONSerialization:
         serialized = state.serialize_json()
         deserialized = States.deserialize_json(serialized)
 
-        assert deserialized == state
+        assert states_equal(deserialized, state)
         assert deserialized.Ns == 5
         assert deserialized.Nr == 3
         assert deserialized.PN == 2
@@ -77,7 +78,7 @@ class TestJSONSerialization:
         serialized = state.serialize_json()
         deserialized = States.deserialize_json(serialized)
 
-        assert deserialized == state
+        assert states_equal(deserialized, state)
         assert deserialized.MKSKIPPED == state.MKSKIPPED
         assert len(deserialized.MKSKIPPED) == 3
 
@@ -96,7 +97,7 @@ class TestJSONSerialization:
         assert deserialized.DHr == state.DHr
         assert deserialized.CKs is None
         assert deserialized.CKr is None
-        assert deserialized == state
+        assert states_equal(deserialized, state)
 
     def test_json_serialization_empty_mkskipped(self):
         """Test JSON serialization with empty MKSKIPPED"""
@@ -110,7 +111,7 @@ class TestJSONSerialization:
         deserialized = States.deserialize_json(serialized)
 
         assert deserialized.MKSKIPPED == {}
-        assert deserialized == state
+        assert states_equal(deserialized, state)
 
     def test_json_serialization_without_required_fields(self):
         """Test JSON serialization fails without DHs or RK"""
@@ -215,7 +216,7 @@ class TestPickleToJSONMigration:
         state_from_json = States.deserialize_json(json_serialized)
 
         # Verify all data is preserved
-        assert state_from_json == state_original
+        assert states_equal(state_from_json, state_original)
         assert state_from_json.Ns == 5
         assert state_from_json.Nr == 3
         assert state_from_json.PN == 2
@@ -251,7 +252,7 @@ class TestPickleToJSONMigration:
         state_from_json = States.deserialize_json(json_serialized)
 
         # Verify all data is preserved including MKSKIPPED
-        assert state_from_json == state_original
+        assert states_equal(state_from_json, state_original)
         assert state_from_json.MKSKIPPED == state_original.MKSKIPPED
         assert len(state_from_json.MKSKIPPED) == 3
 
@@ -274,7 +275,7 @@ class TestPickleToJSONMigration:
         json_serialized = state_from_pickle.serialize_json()
         state_from_json = States.deserialize_json(json_serialized)
 
-        assert state_from_json == state_original
+        assert states_equal(state_from_json, state_original)
         assert state_from_json.CKs is None
         assert state_from_json.CKr is None
 
@@ -305,9 +306,11 @@ class TestPickleToJSONMigration:
         """Test migrating multiple different states from pickle to JSON"""
         states = []
 
-        # Create 5 different states
         for i in range(5):
             keystore_path = f"db_keys/test_migration_{i}.db"
+            if os.path.exists(keystore_path):
+                os.remove(keystore_path)
+
             dh = x25519(keystore_path=keystore_path)
             dh.init()
 
@@ -326,16 +329,14 @@ class TestPickleToJSONMigration:
 
             states.append((state, keystore_path))
 
-        # Migrate each state
         for original_state, keystore_path in states:
             pickle_serialized = original_state.serialize()
             state_from_pickle = States.deserialize(pickle_serialized)
             json_serialized = state_from_pickle.serialize_json()
             state_from_json = States.deserialize_json(json_serialized)
 
-            assert state_from_json == original_state
+            assert states_equal(state_from_json, original_state)
 
-            # Cleanup
             if os.path.exists(keystore_path):
                 os.remove(keystore_path)
 
@@ -368,11 +369,11 @@ class TestPickleToJSONMigration:
         json_roundtrip = States.deserialize_json(state_original.serialize_json())
 
         # Both should equal the original
-        assert pickle_roundtrip == state_original
-        assert json_roundtrip == state_original
+        assert states_equal(pickle_roundtrip, state_original)
+        assert states_equal(json_roundtrip, state_original)
 
         # And should equal each other
-        assert pickle_roundtrip == json_roundtrip
+        assert states_equal(pickle_roundtrip, json_roundtrip)
 
 
 class TestJSONSecurityProperties:
@@ -401,7 +402,7 @@ class TestJSONSecurityProperties:
 
         # This should safely deserialize without any code execution
         deserialized = States.deserialize_json(serialized)
-        assert deserialized == state
+        assert states_equal(deserialized, state)
 
     def test_json_malformed_input_handling(self):
         """Test that malformed JSON input raises appropriate errors"""

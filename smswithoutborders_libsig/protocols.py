@@ -10,7 +10,6 @@ from Crypto.Cipher import AES
 from Crypto.Hash import HMAC, SHA256, SHA512
 from Crypto.Protocol.KDF import HKDF
 from Crypto.Util.Padding import pad, unpad
-from cryptography.hazmat.primitives import constant_time
 
 import smswithoutborders_libsig.helpers as helpers
 from smswithoutborders_libsig.keypairs import Keypairs, x25519
@@ -182,35 +181,6 @@ class States:
 
         return state
 
-    def __eq__(self, other):
-        if not isinstance(other, States):
-            return NotImplemented
-
-        dhr_equal = constant_time.bytes_eq(
-            self.DHr if self.DHr else b"", other.DHr if other.DHr else b""
-        )
-        rk_equal = constant_time.bytes_eq(
-            self.RK if self.RK else b"", other.RK if other.RK else b""
-        )
-        cks_equal = constant_time.bytes_eq(
-            self.CKs if self.CKs else b"", other.CKs if other.CKs else b""
-        )
-        ckr_equal = constant_time.bytes_eq(
-            self.CKr if self.CKr else b"", other.CKr if other.CKr else b""
-        )
-
-        return (
-            self.DHs == other.DHs
-            and dhr_equal
-            and rk_equal
-            and cks_equal
-            and ckr_equal
-            and self.Ns == other.Ns
-            and self.Nr == other.Nr
-            and self.PN == other.PN
-            and self.MKSKIPPED == other.MKSKIPPED
-        )
-
 
 class HEADERS:
     dh: bytes  # public key bytes
@@ -241,13 +211,6 @@ class HEADERS:
         headers.dh = data[8:]
 
         return headers
-
-    def __eq__(self, other):
-        return (
-            constant_time.bytes_eq(self.dh, other.dh)
-            and self.pn == other.pn
-            and self.n == other.n
-        )
 
 
 class DHRatchet:

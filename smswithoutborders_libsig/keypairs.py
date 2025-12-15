@@ -6,7 +6,7 @@ import struct
 import uuid
 from abc import ABC, abstractmethod
 
-from cryptography.hazmat.primitives import constant_time, hashes
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric.x25519 import (
     X25519PrivateKey,
     X25519PublicKey,
@@ -139,18 +139,6 @@ class x25519(Keypairs):
         x.secret_key = data[(8 + keystore_path_len + pnt_keystore_len) :].decode()
         return x
 
-    def __eq__(self, other):
-        if not isinstance(other, Keypairs):
-            return NotImplemented
-
-        return (
-            other.keystore_path == self.keystore_path
-            and other.pnt_keystore == self.pnt_keystore
-            and constant_time.bytes_eq(
-                other.secret_key.encode(), self.secret_key.encode()
-            )
-        )
-
     def load_keystore(self, pnt_keystore: str, secret_key: bytes):
         if not self.keystore_path:
             self.keystore_path = f"db_keys/{pnt_keystore}.db"
@@ -170,23 +158,3 @@ class x25519(Keypairs):
         x = self.load_keystore(self.pnt_keystore, self.secret_key)
         shared_key = x.exchange(X25519PublicKey.from_public_bytes(public_key))
         return Keypairs.__agree__(shared_key, info, salt)
-
-
-if __name__ == "__main__":
-    client1 = x25519()
-    client1_public_key = client1.init()
-
-    client2 = x25519()
-    client2_public_key = client2.init()
-
-    dk = client1.agree(client2_public_key)
-    dk1 = client2.agree(client1_public_key)
-
-    assert dk != None
-    assert dk1 != None
-    assert dk == dk1
-
-    s_c1 = client1.serialize()
-    d_c1 = client1.deserialize(s_c1)
-
-    assert d_c1 == client1
