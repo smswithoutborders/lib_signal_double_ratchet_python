@@ -102,11 +102,11 @@ class x25519:
             salt=None, secret_key=None):
         if not secret_key:
             secret_key = secrets.token_bytes(self.size) # store this
-            extended_derived_key = HKDF(algorithm=hashes.SHA256(),
+            dk = HKDF(algorithm=hashes.SHA256(),
                                length=self.size,
                                salt=salt,
                                info=info,).derive(secret_key)
-            secret_key = base64.b64encode(extended_derived_key).decode()
+            secret_key = binascii.hexlify(dk).decode("ascii")
 
         keystore = Keystore(keystore_path, secret_key)
         keystore.store(keypair=(pk, _pk), pnt=pnt_keystore)
@@ -121,6 +121,10 @@ class x25519:
     def __agree__(self, secret_key, info=b"x25591_key_exchange", salt=None):
         return HKDF(algorithm=hashes.SHA256(), 
                     length=self.size, salt=salt, info=info,).derive(secret_key) 
+
+    def migrate(self, old_key: str) -> str:
+        dec_key = base64.b64decode(old_key)
+        return binascii.hexlify(dec_key).decode("ascii")
 
 
 if __name__ == "__main__":
