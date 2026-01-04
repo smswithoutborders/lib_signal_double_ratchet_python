@@ -123,18 +123,17 @@ class HEADERS:
                 self.pn == other.pn and
                 self.n == other.n)
 
-class DHRatchet:
-    def __init__(self, state: States, header: HEADERS):
-        state.PN = state.Ns
-        state.Ns = 0
-        state.Nr = 0
+def DHRatchet(state: States, header: HEADERS): 
+    state.PN = state.Ns
+    state.Ns = 0
+    state.Nr = 0
 
-        state.DHr = header.dh
-        shared_secret = DH(state.DHs, state.DHr)
-        state.RK, state.CKr = KDF_RK(state.RK, shared_secret)
-        state.DHs = GENERATE_DH(state.DHs.keystore_path, state.DHs.secret_key)
-        shared_secret = DH(state.DHs, state.DHr)
-        state.RK, state.CKs = KDF_RK(state.RK, shared_secret)
+    state.DHr = header.dh
+    shared_secret = DH(state.DHs, state.DHr)
+    state.RK, state.CKr = KDF_RK(state.RK, shared_secret)
+    state.DHs = GENERATE_DH(state.DHs.keystore_path, state.DHs.secret_key)
+    shared_secret = DH(state.DHs, state.DHr)
+    state.RK, state.CKs = KDF_RK(state.RK, shared_secret)
 
 
 def GENERATE_DH(keystore_path: str=None, secret_key = None) -> bytes:
