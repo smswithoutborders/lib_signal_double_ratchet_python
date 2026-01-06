@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 
-from smswithoutborders_libsig.keypairs import x25519
+import base64
+import json
+import pickle
+import struct
+import warnings
 
-from Crypto.Protocol.KDF import HKDF
-from Crypto.Random import get_random_bytes
-from Crypto.Hash import SHA512, SHA256, HMAC
 from Crypto.Cipher import AES
+from Crypto.Hash import HMAC, SHA256, SHA512
+from Crypto.Protocol.KDF import HKDF
 from Crypto.Util.Padding import pad, unpad
 
-import logging
-import struct
 import smswithoutborders_libsig.helpers as helpers
-import pickle
-import base64
+from smswithoutborders_libsig.keypairs import x25519
+
 
 class States:
     DHs: x25519 = None
@@ -30,72 +31,165 @@ class States:
     MKSKIPPED = {}
 
     def serialize(self) -> bytes:
-        if not hasattr(self, 'DHs') or self.DHs == None or \
-                not hasattr(self, 'RK') or self.RK == None: 
-                    raise Exception("State cannot be serialized: reason DHs == None or RK == None")
+        warnings.warn(
+            "serialize() is deprecated due to pickle usage. Use serialize_json() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if (
+            not hasattr(self, "DHs")
+            or self.DHs is None
+            or not hasattr(self, "RK")
+            or self.RK is None
+        ):
+            raise Exception(
+                "State cannot be serialized: reason DHs == None or RK == None"
+            )
 
         s_keypairs = self.DHs.serialize()
 
         s_keypairs_len = len(s_keypairs)
-        dhr_len  = len(self.DHr) if not self.DHr is None else 0
-        rk_len = len(self.RK) if not self.RK is None else 0
-        ck_len  = len(self.CKs) if not self.CKs is None else 0
-        cr_len  = len(self.CKr) if not self.CKr is None else 0
+        dhr_len = len(self.DHr) if self.DHr is not None else 0
+        rk_len = len(self.RK) if self.RK is not None else 0
+        ck_len = len(self.CKs) if self.CKs is not None else 0
+        cr_len = len(self.CKr) if self.CKr is not None else 0
 
-        len_start = struct.pack(f"<{'i'*5}", s_keypairs_len, rk_len, dhr_len, ck_len, cr_len)
+        len_start = struct.pack(
+            f"<{'i' * 5}", s_keypairs_len, rk_len, dhr_len, ck_len, cr_len
+        )
         _serialized = len_start + s_keypairs + self.RK
         for i in [self.DHr, self.CKs, self.CKr]:
-            if i: 
+            if i:
                 _serialized = _serialized + i
-        _serialized = _serialized + struct.pack("<iii", self.Ns, self.Nr, self.PN) + \
-                pickle.dumps(self.MKSKIPPED)
+        _serialized = (
+            _serialized
+            + struct.pack("<iii", self.Ns, self.Nr, self.PN)
+            + pickle.dumps(self.MKSKIPPED)
+        )
         return _serialized
 
     @staticmethod
     def deserialize(data):
+        warnings.warn(
+            "deserialize() is deprecated due to pickle usage. Use deserialize_json() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         state = States()
 
-        s_keypairs_len, dhr_len, rk_len, cks_len, ckr_len = \
-                struct.unpack(f"<{'i'*5}", data[0:4*5])
+        s_keypairs_len, dhr_len, rk_len, cks_len, ckr_len = struct.unpack(
+            f"<{'i' * 5}", data[0 : 4 * 5]
+        )
 
-        data = data[4*5:]
+        data = data[4 * 5 :]
 
         state.DHs = x25519().deserialize(data[:s_keypairs_len])
-        state.RK = data[s_keypairs_len: (s_keypairs_len + rk_len)]
-        state.DHr = data[(s_keypairs_len + rk_len): (s_keypairs_len + dhr_len + rk_len)]
-        state.CKs = data[(s_keypairs_len + dhr_len + rk_len): (s_keypairs_len + dhr_len + rk_len + cks_len)]
-        if state.CKs == b'':
+        state.RK = data[s_keypairs_len : (s_keypairs_len + rk_len)]
+        state.DHr = data[
+            (s_keypairs_len + rk_len) : (s_keypairs_len + dhr_len + rk_len)
+        ]
+        state.CKs = data[
+            (s_keypairs_len + dhr_len + rk_len) : (
+                s_keypairs_len + dhr_len + rk_len + cks_len
+            )
+        ]
+        if state.CKs == b"":
             state.CKs = None
-        state.CKr = data[(s_keypairs_len + dhr_len + rk_len + cks_len): (s_keypairs_len + dhr_len + \
-                rk_len + cks_len + ckr_len)]
-        if state.CKr == b'':
+        state.CKr = data[
+            (s_keypairs_len + dhr_len + rk_len + cks_len) : (
+                s_keypairs_len + dhr_len + rk_len + cks_len + ckr_len
+            )
+        ]
+        if state.CKr == b"":
             state.CKr = None
-        state.Ns, state.Nr, state.PN = \
-                struct.unpack("<iii", 
-                              data[(s_keypairs_len + dhr_len + rk_len + cks_len + ckr_len): 
-                                   (s_keypairs_len + dhr_len + rk_len + cks_len + ckr_len + 3*4)])
-        state.MKSKIPPED = pickle.loads(data[(s_keypairs_len + dhr_len + rk_len + cks_len + ckr_len + 3*4):])
+        state.Ns, state.Nr, state.PN = struct.unpack(
+            "<iii",
+            data[
+                (s_keypairs_len + dhr_len + rk_len + cks_len + ckr_len) : (
+                    s_keypairs_len + dhr_len + rk_len + cks_len + ckr_len + 3 * 4
+                )
+            ],
+        )
+        state.MKSKIPPED = pickle.loads(
+            data[(s_keypairs_len + dhr_len + rk_len + cks_len + ckr_len + 3 * 4) :]
+        )
 
         return state
 
-    def __eq__(self, other):
-        if not isinstance(other, States):
-            return NotImplemented
+    def serialize_json(self) -> bytes:
+        """
+        Serialize state to JSON format
+        Returns bytes containing JSON-encoded state.
+        """
+        if (
+            not hasattr(self, "DHs")
+            or self.DHs is None
+            or not hasattr(self, "RK")
+            or self.RK is None
+        ):
+            raise Exception(
+                "State cannot be serialized: reason DHs == None or RK == None"
+            )
 
-        return (self.DHs == other.DHs and self.DHr == other.DHr 
-                and self.RK == other.RK and self.CKs == other.CKs
-                and self.CKr == other.CKr and self.Ns == other.Ns
-                and self.Nr == other.Nr and self.PN == other.PN
-                and self.MKSKIPPED == other.MKSKIPPED)
+        mkskipped_encoded = {}
+        for (dh_key, n), mk_value in self.MKSKIPPED.items():
+            key_str = f"{base64.b64encode(dh_key).decode('ascii')}:{n}"
+            mkskipped_encoded[key_str] = base64.b64encode(mk_value).decode("ascii")
+
+        state_dict = {
+            "version": 1,
+            "DHs": base64.b64encode(self.DHs.serialize()).decode("ascii"),
+            "DHr": base64.b64encode(self.DHr).decode("ascii") if self.DHr else None,
+            "RK": base64.b64encode(self.RK).decode("ascii"),
+            "CKs": base64.b64encode(self.CKs).decode("ascii") if self.CKs else None,
+            "CKr": base64.b64encode(self.CKr).decode("ascii") if self.CKr else None,
+            "Ns": self.Ns,
+            "Nr": self.Nr,
+            "PN": self.PN,
+            "MKSKIPPED": mkskipped_encoded,
+        }
+
+        return json.dumps(state_dict).encode("utf-8")
+
+    @staticmethod
+    def deserialize_json(data: bytes):
+        """
+        Deserialize state from JSON format.
+        """
+        state = States()
+        state_dict = json.loads(data.decode("utf-8"))
+
+        if state_dict.get("version") != 1:
+            raise ValueError(f"Unsupported state version: {state_dict.get('version')}")
+
+        state.DHs = x25519().deserialize(base64.b64decode(state_dict["DHs"]))
+        state.RK = base64.b64decode(state_dict["RK"])
+        state.DHr = base64.b64decode(state_dict["DHr"]) if state_dict["DHr"] else None
+        state.CKs = base64.b64decode(state_dict["CKs"]) if state_dict["CKs"] else None
+        state.CKr = base64.b64decode(state_dict["CKr"]) if state_dict["CKr"] else None
+        state.Ns = state_dict["Ns"]
+        state.Nr = state_dict["Nr"]
+        state.PN = state_dict["PN"]
+
+        state.MKSKIPPED = {}
+        for key_str, mk_value_encoded in state_dict["MKSKIPPED"].items():
+            dh_b64, n_str = key_str.rsplit(":", 1)
+            dh_key = base64.b64decode(dh_b64)
+            n = int(n_str)
+            mk_value = base64.b64decode(mk_value_encoded)
+            state.MKSKIPPED[(dh_key, n)] = mk_value
+
+        return state
+
 
 class HEADERS:
-    dh: bytes # public key bytes
+    dh: bytes  # public key bytes
     pn = None
     n = None
-    
+
     LEN = None
-    
-    def __init__(self, dh_pair: bytes=None, pn=None, n=None):
+
+    def __init__(self, dh_pair: bytes = None, pn=None, n=None):
         if dh_pair:
             self.dh = dh_pair.get_public_key()
         self.pn = pn
@@ -118,12 +212,8 @@ class HEADERS:
 
         return headers
 
-    def __eq__(self, other):
-        return (self.dh == other.dh and 
-                self.pn == other.pn and
-                self.n == other.n)
 
-def DHRatchet(state: States, header: HEADERS): 
+def DHRatchet(state: States, header: HEADERS):
     state.PN = state.Ns
     state.Ns = 0
     state.Nr = 0
@@ -136,41 +226,46 @@ def DHRatchet(state: States, header: HEADERS):
     state.RK, state.CKs = KDF_RK(state.RK, shared_secret)
 
 
-def GENERATE_DH(keystore_path: str=None, secret_key = None) -> bytes:
+def GENERATE_DH(keystore_path: str = None, secret_key=None) -> bytes:
     x = x25519(keystore_path=keystore_path, secret_key=secret_key)
     x.init()
     return x
 
+
 def DH(dh_pair: x25519, dh_pub: bytes) -> bytes:
     return dh_pair.agree(dh_pub)
 
-def KDF_RK(rk, dh_out): 
-    length=32
-    num_keys=2
+
+def KDF_RK(rk, dh_out):
+    length = 32
+    num_keys = 2
 
     # TODO: make meaninful information
-    information=b'KDF_RK'
+    information = b"KDF_RK"
 
-    return HKDF(master=dh_out, 
-                 key_len=length, 
-                 salt=rk, 
-                 hashmod=SHA512, 
-                 num_keys=num_keys, context=information)
+    return HKDF(
+        master=dh_out,
+        key_len=length,
+        salt=rk,
+        hashmod=SHA512,
+        num_keys=num_keys,
+        context=information,
+    )
 
 
 def KDF_CK(ck):
     d_ck = HMAC.new(ck, digestmod=SHA256)
-    _ck = d_ck.update(b'\x01').digest()
+    _ck = d_ck.update(b"\x01").digest()
 
     d_ck = HMAC.new(ck, digestmod=SHA256)
-    mk = d_ck.update(b'\x02').digest()
+    mk = d_ck.update(b"\x02").digest()
     return _ck, mk
 
 
 def ENCRYPT(mk, plaintext, associated_data) -> bytes:
     key, auth_key, iv = helpers.get_mac_parameters(mk)
     cipher = AES.new(key, AES.MODE_CBC, iv)
-    cipher_text = cipher.encrypt(pad(plaintext,  AES.block_size))
+    cipher_text = cipher.encrypt(pad(plaintext, AES.block_size))
     hmac = helpers.build_verification_hash(auth_key, associated_data, cipher_text)
     return cipher_text + hmac.digest()
 

@@ -170,3 +170,4 @@ sample.py
 vault.py
 parser.py
 *.pem
+.DS_Store

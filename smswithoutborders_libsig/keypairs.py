@@ -1,22 +1,21 @@
 #!/usr/bin/env python3
 
-from abc import ABC, abstractmethod
-
-# X25519
-from cryptography.hazmat.primitives import hashes 
-from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
-from cryptography.hazmat.primitives import serialization
-import binascii
 import base64
+import binascii
+import secrets
+import struct
+import uuid
+from typing import Self
+
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric.x25519 import (
+    X25519PrivateKey,
+    X25519PublicKey,
+)
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from smswithoutborders_libsig.keystore import Keystore
 
-import base64
-import secrets
-import uuid
-import struct
-from typing import Self  # Available in Python 3.11+
 
 class x25519:
     def __init__(self, keystore_path=None, pnt_keystore=None, secret_key=None):
@@ -40,56 +39,56 @@ class x25519:
         if not self.keystore_path:
             self.keystore_path = f"db_keys/{self.pnt_keystore}.db"
 
-        self.secret_key = self.store(pk, _pk, self.keystore_path, 
-                self.pnt_keystore, secret_key=self.secret_key)
+        self.secret_key = self.store(
+            pk, _pk, self.keystore_path, self.pnt_keystore, secret_key=self.secret_key
+        )
         return pk
 
     def serialize(self) -> bytes:
-        """
-        """
-        if not hasattr(self, 'pnt_keystore') or self.pnt_keystore == None or \
-                not hasattr(self, 'keystore_path') or self.keystore_path == None or \
-                not hasattr(self, 'secret_key') or self.secret_key == None:
+        """ """
+        if (
+            not hasattr(self, "pnt_keystore")
+            or self.pnt_keystore == None
+            or not hasattr(self, "keystore_path")
+            or self.keystore_path == None
+            or not hasattr(self, "secret_key")
+            or self.secret_key == None
+        ):
             raise Exception("keypair not initialized -- init()")
 
         keystore_path_len = len(self.keystore_path)
         pnt_keystore_len = len(self.pnt_keystore)
-        return struct.pack("<ii", keystore_path_len, pnt_keystore_len) + \
-                self.keystore_path.encode() + \
-                self.pnt_keystore.encode() + self.secret_key.encode()
+        return (
+            struct.pack("<ii", keystore_path_len, pnt_keystore_len)
+            + self.keystore_path.encode()
+            + self.pnt_keystore.encode()
+            + self.secret_key.encode()
+        )
 
     def deserialize(self, data) -> Self:
-        """
-        """
+        """ """
         x = x25519()
 
         keystore_path_len, pnt_keystore_len = struct.unpack("<ii", data[0:8])
         x.keystore_path = data[8 : (8 + keystore_path_len)].decode()
-        x.pnt_keystore = data[(8 + keystore_path_len) : (8 + keystore_path_len + pnt_keystore_len)].decode()
-        x.secret_key = data[(8 + keystore_path_len + pnt_keystore_len):].decode()
+        x.pnt_keystore = data[
+            (8 + keystore_path_len) : (8 + keystore_path_len + pnt_keystore_len)
+        ].decode()
+        x.secret_key = data[(8 + keystore_path_len + pnt_keystore_len) :].decode()
         return x
-
-    def __eq__(self, other):
-        if not isinstance(other, self):
-            return NotImplemented
-
-        return (other.keystore_path == self.keystore_path and
-                other.pnt_keystore == self.pnt_keystore and
-                other.secret_key == self.secret_key)
 
     def load_keystore(self, pnt_keystore: str, secret_key: bytes):
         if not self.keystore_path:
             self.keystore_path = f"db_keys/{pnt_keystore}.db"
-        ppk = self.fetch(pnt_keystore, secret_key, self.keystore_path )
+        ppk = self.fetch(pnt_keystore, secret_key, self.keystore_path)
         if ppk:
             self.pnt_keystore = pnt_keystore
             self.secret_key = secret_key
 
             return X25519PrivateKey.from_private_bytes(ppk[1])
 
-
     def get_public_key(self):
-        ppk = self.fetch(self.pnt_keystore, self.secret_key, self.keystore_path )
+        ppk = self.fetch(self.pnt_keystore, self.secret_key, self.keystore_path)
         if ppk:
             return ppk[0]
 
@@ -100,7 +99,7 @@ class x25519:
 
     def store(self, pk, _pk, keystore_path, pnt_keystore, secret_key=None) -> bytes:
         if not secret_key:
-            secret_key = secrets.token_bytes(self.size) # store this
+            secret_key = secrets.token_bytes(self.size)  # store this
 
         keystore = Keystore(keystore_path, secret_key)
         keystore.store(keypair=(pk, _pk), pnt=pnt_keystore)
@@ -110,32 +109,15 @@ class x25519:
     def fetch(self, pnt_keystore, secret_key, keystore_path=None):
         keystore = Keystore(keystore_path, secret_key)
         return keystore.fetch(pnt_keystore)
-    
 
     def __agree__(self, secret_key, info=b"x25591_key_exchange", salt=None):
-        return HKDF(algorithm=hashes.SHA256(), 
-                    length=self.size, salt=salt, info=info,).derive(secret_key) 
+        return HKDF(
+            algorithm=hashes.SHA256(),
+            length=self.size,
+            salt=salt,
+            info=info,
+        ).derive(secret_key)
 
     def migrate(self, old_key: str) -> str:
         dec_key = base64.b64decode(old_key)
         return binascii.hexlify(dec_key).decode("ascii")
-
-
-if __name__ == "__main__":
-    client1 = x25519()
-    client1_public_key = client1.init()
-
-    client2 = x25519()
-    client2_public_key = client2.init()
-
-    dk = client1.agree(client2_public_key)
-    dk1 = client2.agree(client1_public_key)
-
-    assert(dk != None)
-    assert(dk1 != None)
-    assert(dk == dk1)
-
-    s_c1 = client1.serialize()
-    d_c1 = client1.deserialize(s_c1)
-
-    assert(d_c1 == client1)
