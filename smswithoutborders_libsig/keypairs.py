@@ -123,13 +123,14 @@ class x25519:
         return binascii.hexlify(dec_key).decode("ascii")
 
     def agreeWithAuthAndNonce(
-            self, 
-            auth_private_key: X25519PrivateKey, # Clients have this as static keypairs
-            public_key: bytes, 
-            nonce1: bytes,
-            nonce2: bytes,
-            salt: bytes = b"RelaySMS v1",
-            info: bytes = b"RelaySMS C2S DR v1") -> bytes:
+        self, 
+        auth_private_key: X25519PrivateKey, # Clients have this as static keypairs
+        public_key: bytes, 
+        nonce1: bytes,
+        nonce2: bytes,
+        salt: bytes = b"RelaySMS v1",
+        info: bytes = b"RelaySMS C2S DR v1"
+    ) -> bytes:
         handshake_salt = nonce1 + nonce2
         eph_private_key = self.load_keystore(self.pnt_keystore, self.secret_key)
         dh1 = auth_private_key.exchange(X25519PublicKey.from_public_bytes(public_key))
