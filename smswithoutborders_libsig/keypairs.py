@@ -121,3 +121,57 @@ class x25519:
     def migrate(self, old_key: str) -> str:
         dec_key = base64.b64decode(old_key)
         return binascii.hexlify(dec_key).decode("ascii")
+
+    def agreeWithAuthAndNonce(
+            self, 
+            auth_private_key: X25519PrivateKey, # Clients have this as static keypairs
+            public_key: bytes, 
+            nonce1: bytes,
+            nonce2: bytes,
+            salt: bytes = b"RelaySMS v1",
+            info: bytes = b"RelaySMS C2S DR v1") -> bytes:
+        handshake_salt = nonce1 + nonce2
+        eph_private_key = self.load_keystore(self.pnt_keystore, self.secret_key)
+        dh1 = auth_private_key.exchange(X25519PublicKey.from_public_bytes(public_key))
+        dh2 = eph_private_key.exchange(X25519PublicKey.from_public_bytes(public_key))
+
+        chain_key = HKDF( 
+            algorithm=hashes.SHA256(),
+            length = self.size,
+            salt = salt,
+            info = info,
+        ).derive(handshake_salt)
+
+        chain_key = HKDF( 
+            algorithm=hashes.SHA256(),
+            length = self.size,
+            salt = chain_key,
+            info = info,
+        ).derive(dh1)
+
+        return HKDF( 
+            algorithm=hashes.SHA256(),
+            length = self.size,
+            salt = chain_key,
+            info = info,
+        ).derive(dh2)
+
+
+if __name__ == "__main__":
+    client1 = x25519()
+    client1_public_key = client1.init()
+
+    client2 = x25519()
+    client2_public_key = client2.init()
+
+    dk = client1.agree(client2_public_key)
+    dk1 = client2.agree(client1_public_key)
+
+    assert(dk != None)
+    assert(dk1 != None)
+    assert(dk == dk1)
+
+    s_c1 = client1.serialize()
+    d_c1 = client1.deserialize(s_c1)
+
+    assert(d_c1 == client1)
