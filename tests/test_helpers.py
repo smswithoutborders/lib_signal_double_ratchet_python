@@ -2,7 +2,7 @@
 
 from cryptography.hazmat.primitives import constant_time
 
-from smswithoutborders_libsig.keypairs import Keypairs
+from smswithoutborders_libsig.keypairs import x25519
 from smswithoutborders_libsig.protocols import HEADERS, States
 
 
@@ -54,7 +54,7 @@ def headers_equal(header1, header2) -> bool:
 def keypairs_equal(keypair1, keypair2) -> bool:
     """Compare two Keypairs objects."""
 
-    if not isinstance(keypair1, Keypairs) or not isinstance(keypair2, Keypairs):
+    if not isinstance(keypair1, x25519) or not isinstance(keypair2, x25519):
         return False
 
     return (

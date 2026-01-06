@@ -39,7 +39,7 @@ class Keystore:
             sqlite3.Connection: SQLite database connection.
         """
         conn = sqlite.connect(self.db_name)
-        conn.execute(f"PRAGMA key = '{self.mk}'")
+        conn.execute(f"PRAGMA key = \"x'{self.mk}'\";")
         conn.execute("PRAGMA cipher_compatibility = 3")
         return conn
 

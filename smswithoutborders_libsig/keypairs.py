@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
 import base64
+import binascii
 import secrets
 import struct
 import uuid
-from abc import ABC, abstractmethod
+from typing import Self
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric.x25519 import (
@@ -16,75 +17,12 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from smswithoutborders_libsig.keystore import Keystore
 
 
-class Keypairs(ABC):
-    size = 32
-
-    @abstractmethod
-    def init(self):
-        pass
-
-    @abstractmethod
-    def agree(self, public_key, info, salt):
-        pass
-
-    @abstractmethod
-    def get_public_key(self):
-        pass
-
-    @abstractmethod
-    def load_keystore(self):
-        pass
-
-    @abstractmethod
-    def serialize(self):
-        pass
-
-    @abstractmethod
-    def deserialize(self):
-        pass
-
-    def store(
-        pk,
-        _pk,
-        keystore_path,
-        pnt_keystore,
-        info=b"x25591_key_exchange",
-        salt=None,
-        secret_key=None,
-    ):
-        if not secret_key:
-            secret_key = secrets.token_bytes(Keypairs.size)  # store this
-            extended_derived_key = HKDF(
-                algorithm=hashes.SHA256(),
-                length=Keypairs.size,
-                salt=salt,
-                info=info,
-            ).derive(secret_key)
-            secret_key = base64.b64encode(extended_derived_key).decode()
-
-        keystore = Keystore(keystore_path, secret_key)
-        keystore.store(keypair=(pk, _pk), pnt=pnt_keystore)
-
-        return secret_key
-
-    def fetch(pnt_keystore, secret_key, keystore_path=None):
-        keystore = Keystore(keystore_path, secret_key)
-        return keystore.fetch(pnt_keystore)
-
-    def __agree__(secret_key, info=b"x25591_key_exchange", salt=None):
-        return HKDF(
-            algorithm=hashes.SHA256(),
-            length=Keypairs.size,
-            salt=salt,
-            info=info,
-        ).derive(secret_key)
-
-
-class x25519(Keypairs):
+class x25519:
     def __init__(self, keystore_path=None, pnt_keystore=None, secret_key=None):
         self.keystore_path = keystore_path
         self.pnt_keystore = pnt_keystore
         self.secret_key = secret_key
+        self.size = 32
 
     def init(self):
         x = X25519PrivateKey.generate()
@@ -101,7 +39,7 @@ class x25519(Keypairs):
         if not self.keystore_path:
             self.keystore_path = f"db_keys/{self.pnt_keystore}.db"
 
-        self.secret_key = Keypairs.store(
+        self.secret_key = self.store(
             pk, _pk, self.keystore_path, self.pnt_keystore, secret_key=self.secret_key
         )
         return pk
@@ -127,7 +65,7 @@ class x25519(Keypairs):
             + self.secret_key.encode()
         )
 
-    def deserialize(self, data) -> Keypairs:
+    def deserialize(self, data) -> Self:
         """ """
         x = x25519()
 
@@ -142,7 +80,7 @@ class x25519(Keypairs):
     def load_keystore(self, pnt_keystore: str, secret_key: bytes):
         if not self.keystore_path:
             self.keystore_path = f"db_keys/{pnt_keystore}.db"
-        ppk = Keypairs.fetch(pnt_keystore, secret_key, self.keystore_path)
+        ppk = self.fetch(pnt_keystore, secret_key, self.keystore_path)
         if ppk:
             self.pnt_keystore = pnt_keystore
             self.secret_key = secret_key
@@ -150,11 +88,52 @@ class x25519(Keypairs):
             return X25519PrivateKey.from_private_bytes(ppk[1])
 
     def get_public_key(self):
-        ppk = Keypairs.fetch(self.pnt_keystore, self.secret_key, self.keystore_path)
+        ppk = self.fetch(self.pnt_keystore, self.secret_key, self.keystore_path)
         if ppk:
             return ppk[0]
 
     def agree(self, public_key, info=b"x25591_key_exchange", salt=None) -> bytes:
         x = self.load_keystore(self.pnt_keystore, self.secret_key)
         shared_key = x.exchange(X25519PublicKey.from_public_bytes(public_key))
-        return Keypairs.__agree__(shared_key, info, salt)
+        return self.__agree__(shared_key, info, salt)
+
+    def store(
+        self,
+        pk,
+        _pk,
+        keystore_path,
+        pnt_keystore,
+        info=b"x25591_key_exchange",
+        salt=None,
+        secret_key=None,
+    ):
+        if not secret_key:
+            secret_key = secrets.token_bytes(self.size)  # store this
+            dk = HKDF(
+                algorithm=hashes.SHA256(),
+                length=self.size,
+                salt=salt,
+                info=info,
+            ).derive(secret_key)
+            secret_key = binascii.hexlify(dk).decode("ascii")
+
+        keystore = Keystore(keystore_path, secret_key)
+        keystore.store(keypair=(pk, _pk), pnt=pnt_keystore)
+
+        return secret_key
+
+    def fetch(self, pnt_keystore, secret_key, keystore_path=None):
+        keystore = Keystore(keystore_path, secret_key)
+        return keystore.fetch(pnt_keystore)
+
+    def __agree__(self, secret_key, info=b"x25591_key_exchange", salt=None):
+        return HKDF(
+            algorithm=hashes.SHA256(),
+            length=self.size,
+            salt=salt,
+            info=info,
+        ).derive(secret_key)
+
+    def migrate(self, old_key: str) -> str:
+        dec_key = base64.b64decode(old_key)
+        return binascii.hexlify(dec_key).decode("ascii")

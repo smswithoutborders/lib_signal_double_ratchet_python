@@ -12,11 +12,11 @@ from Crypto.Protocol.KDF import HKDF
 from Crypto.Util.Padding import pad, unpad
 
 import smswithoutborders_libsig.helpers as helpers
-from smswithoutborders_libsig.keypairs import Keypairs, x25519
+from smswithoutborders_libsig.keypairs import x25519
 
 
 class States:
-    DHs: Keypairs = None
+    DHs: x25519 = None
     DHr: bytes = None
 
     RK: bytes = None
@@ -213,18 +213,17 @@ class HEADERS:
         return headers
 
 
-class DHRatchet:
-    def __init__(self, state: States, header: HEADERS):
-        state.PN = state.Ns
-        state.Ns = 0
-        state.Nr = 0
+def DHRatchet(state: States, header: HEADERS):
+    state.PN = state.Ns
+    state.Ns = 0
+    state.Nr = 0
 
-        state.DHr = header.dh
-        shared_secret = DH(state.DHs, state.DHr)
-        state.RK, state.CKr = KDF_RK(state.RK, shared_secret)
-        state.DHs = GENERATE_DH(state.DHs.keystore_path, state.DHs.secret_key)
-        shared_secret = DH(state.DHs, state.DHr)
-        state.RK, state.CKs = KDF_RK(state.RK, shared_secret)
+    state.DHr = header.dh
+    shared_secret = DH(state.DHs, state.DHr)
+    state.RK, state.CKr = KDF_RK(state.RK, shared_secret)
+    state.DHs = GENERATE_DH(state.DHs.keystore_path, state.DHs.secret_key)
+    shared_secret = DH(state.DHs, state.DHr)
+    state.RK, state.CKs = KDF_RK(state.RK, shared_secret)
 
 
 def GENERATE_DH(keystore_path: str = None, secret_key=None) -> bytes:
@@ -233,7 +232,7 @@ def GENERATE_DH(keystore_path: str = None, secret_key=None) -> bytes:
     return x
 
 
-def DH(dh_pair: Keypairs, dh_pub: bytes) -> bytes:
+def DH(dh_pair: x25519, dh_pub: bytes) -> bytes:
     return dh_pair.agree(dh_pub)
 
 

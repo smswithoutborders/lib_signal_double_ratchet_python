@@ -124,3 +124,8 @@ server_plaintext = Ratchets.decrypt(server_state, header, client_ciphertext, bob
 
 assert(original_plaintext == server_plaintext)
 ```
+
+### Generate static .db files that can be imported
+```python3
+python3 -m smswithoutborders_lib.generate [--destination FILE] # defaults to generated.db in current working directory
+```
