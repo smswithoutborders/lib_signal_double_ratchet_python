@@ -97,25 +97,9 @@ class x25519:
         shared_key = x.exchange(X25519PublicKey.from_public_bytes(public_key))
         return self.__agree__(shared_key, info, salt)
 
-    def store(
-        self,
-        pk,
-        _pk,
-        keystore_path,
-        pnt_keystore,
-        info=b"x25591_key_exchange",
-        salt=None,
-        secret_key=None,
-    ):
+    def store(self, pk, _pk, keystore_path, pnt_keystore, secret_key=None) -> bytes:
         if not secret_key:
             secret_key = secrets.token_bytes(self.size)  # store this
-            dk = HKDF(
-                algorithm=hashes.SHA256(),
-                length=self.size,
-                salt=salt,
-                info=info,
-            ).derive(secret_key)
-            secret_key = binascii.hexlify(dk).decode("ascii")
 
         keystore = Keystore(keystore_path, secret_key)
         keystore.store(keypair=(pk, _pk), pnt=pnt_keystore)
