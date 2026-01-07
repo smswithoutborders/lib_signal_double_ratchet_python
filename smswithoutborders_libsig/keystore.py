@@ -2,7 +2,6 @@
 A module for managing a secure keystore.
 """
 
-
 import os
 import sqlite3 as sqlite
 

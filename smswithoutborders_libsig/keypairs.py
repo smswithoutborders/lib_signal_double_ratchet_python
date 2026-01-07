@@ -99,7 +99,7 @@ class x25519:
 
     def store(self, pk, _pk, keystore_path, pnt_keystore, secret_key=None) -> bytes:
         if not secret_key:
-            secret_key = secrets.token_bytes(self.size)  # store this
+            secret_key = secrets.token_bytes(self.size).hex()
 
         keystore = Keystore(keystore_path, secret_key)
         keystore.store(keypair=(pk, _pk), pnt=pnt_keystore)
