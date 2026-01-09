@@ -4,6 +4,9 @@ import os
 import secrets
 
 import pytest
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PublicKey
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from smswithoutborders_libsig.keypairs import x25519
 
@@ -96,49 +99,87 @@ def test_keypair_serialization(keypair_paths):
 
 
 def test_agree_with_auth_and_nonce_basic(tmp_path):
-    """Test basic agreeWithAuthAndNonce with bidirectional key exchange."""
-    alice_auth_db = os.path.join(tmp_path, "alice_auth.db")
-    alice_eph_db = os.path.join(tmp_path, "alice_eph.db")
-    bob_static_db = os.path.join(tmp_path, "bob_static.db")
-    bob_eph_db = os.path.join(tmp_path, "bob_eph.db")
+    """Test basic agreeWithAuthAndNonce with bidirectional key exchange.
 
-    alice_auth = x25519(alice_auth_db)
-    _ = alice_auth.init()
-    alice_auth_private = alice_auth.load_keystore(
-        alice_auth.pnt_keystore, alice_auth.secret_key
+    Client-side derivation:
+    - Client DH1 = DH(eC, SI_pk)
+    - Client DH2 = DH(eC, eS_pk)
+
+    Server-side derivation:
+    - Server DH1 = DH(SI, eC_pk)
+    - Server DH2 = DH(eS, eC_pk)
+    """
+    # Client keys
+    client_eph_db = os.path.join(tmp_path, "client_eph.db")
+    client_eph = x25519(client_eph_db)
+    client_eph_public = client_eph.init()
+    client_eph_private = client_eph.load_keystore(
+        client_eph.pnt_keystore, client_eph.secret_key
     )
 
-    alice_eph = x25519(alice_eph_db)
-    alice_eph_public = alice_eph.init()
-    _ = alice_eph.load_keystore(alice_eph.pnt_keystore, alice_eph.secret_key)
-
-    bob_static = x25519(bob_static_db)
-    _ = bob_static.init()
-    bob_static_private = bob_static.load_keystore(
-        bob_static.pnt_keystore, bob_static.secret_key
+    # Server keys
+    server_identity_db = os.path.join(tmp_path, "server_identity.db")
+    server_identity = x25519(server_identity_db)
+    server_identity_public = server_identity.init()
+    server_identity_private = server_identity.load_keystore(
+        server_identity.pnt_keystore, server_identity.secret_key
     )
 
-    bob_eph = x25519(bob_eph_db)
-    bob_eph_public = bob_eph.init()
-    _ = bob_eph.load_keystore(bob_eph.pnt_keystore, bob_eph.secret_key)
+    server_eph_db = os.path.join(tmp_path, "server_eph.db")
+    server_eph = x25519(server_eph_db)
+    server_eph_public = server_eph.init()
 
-    nonce1 = secrets.token_bytes(16)
-    nonce2 = secrets.token_bytes(16)
+    # Nonces
+    client_nonce = secrets.token_bytes(16)
+    server_nonce = secrets.token_bytes(16)
 
-    alice_shared = alice_eph.agreeWithAuthAndNonce(
-        alice_auth_private, bob_eph_public, nonce1, nonce2
+    # Client-side derivation
+    handshake_salt = client_nonce + server_nonce
+    salt = b"RelaySMS v1"
+    info = b"RelaySMS C2S DR v1"
+
+    # Client DH computations
+    client_dh1 = client_eph_private.exchange(
+        X25519PublicKey.from_public_bytes(server_identity_public)
+    )
+    client_dh2 = client_eph_private.exchange(
+        X25519PublicKey.from_public_bytes(server_eph_public)
     )
 
-    bob_shared = bob_eph.agreeWithAuthAndNonce(
-        bob_static_private, alice_eph_public, nonce1, nonce2
+    # Client key derivation chain
+    client_ck = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        info=info,
+    ).derive(handshake_salt)
+
+    client_ck = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=client_ck,
+        info=info,
+    ).derive(client_dh1)
+
+    client_shared = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=client_ck,
+        info=info,
+    ).derive(client_dh2)
+
+    # Server-side derivation
+    server_shared = server_eph.agreeWithAuthAndNonce(
+        server_identity_private, client_eph_public, client_nonce, server_nonce
     )
 
-    assert alice_shared is not None
-    assert bob_shared is not None
-    assert isinstance(alice_shared, bytes)
-    assert isinstance(bob_shared, bytes)
-    assert len(alice_shared) == 32
-    assert len(bob_shared) == 32
+    assert client_shared is not None
+    assert server_shared is not None
+    assert isinstance(client_shared, bytes)
+    assert isinstance(server_shared, bytes)
+    assert len(client_shared) == 32
+    assert len(server_shared) == 32
+    assert client_shared == server_shared
 
 
 def test_agree_with_auth_and_nonce_deterministic(tmp_path):
