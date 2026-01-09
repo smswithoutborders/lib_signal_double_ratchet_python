@@ -90,7 +90,21 @@ class x25519:
         if ppk:
             return ppk[0]
 
-    def agree(self, public_key, info=b"x25591_key_exchange", salt=None) -> bytes:
+    def agreeOnly( 
+            self, 
+            public_key, 
+            private_key: X25519PrivateKey = None,  # Clients have this as static keypairs
+    ) -> bytes:
+        if private_key == None:
+            private_key = self.load_keystore(self.pnt_keystore, self.secret_key)
+        return private_key.exchange(X25519PublicKey.from_public_bytes(public_key))
+
+    def agree(
+            self, 
+            public_key, 
+            info=b"x25591_key_exchange", 
+            salt=None
+    ) -> bytes:
         x = self.load_keystore(self.pnt_keystore, self.secret_key)
         shared_key = x.exchange(X25519PublicKey.from_public_bytes(public_key))
         return self.__agree__(shared_key, info, salt)
