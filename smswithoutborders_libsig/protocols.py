@@ -30,43 +30,10 @@ class States:
 
     MKSKIPPED = {}
 
-    def serialize(self) -> bytes:
-        warnings.warn(
-            "serialize() is deprecated due to pickle usage. Use serialize_json() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if (
-            not hasattr(self, "DHs")
-            or self.DHs is None
-            or not hasattr(self, "RK")
-            or self.RK is None
-        ):
-            raise Exception(
-                "State cannot be serialized: reason DHs == None or RK == None"
-            )
-
-        s_keypairs = self.DHs.serialize()
-
-        s_keypairs_len = len(s_keypairs)
-        dhr_len = len(self.DHr) if self.DHr is not None else 0
-        rk_len = len(self.RK) if self.RK is not None else 0
-        ck_len = len(self.CKs) if self.CKs is not None else 0
-        cr_len = len(self.CKr) if self.CKr is not None else 0
-
-        len_start = struct.pack(
-            f"<{'i' * 5}", s_keypairs_len, rk_len, dhr_len, ck_len, cr_len
-        )
-        _serialized = len_start + s_keypairs + self.RK
-        for i in [self.DHr, self.CKs, self.CKr]:
-            if i:
-                _serialized = _serialized + i
-        _serialized = (
-            _serialized
-            + struct.pack("<iii", self.Ns, self.Nr, self.PN)
-            + pickle.dumps(self.MKSKIPPED)
-        )
-        return _serialized
+    HKs: bytes = None
+    HKr: bytes = None
+    NHKs: bytes = None
+    NHKr: bytes = None
 
     @staticmethod
     def deserialize(data):
@@ -146,7 +113,10 @@ class States:
             "Ns": self.Ns,
             "Nr": self.Nr,
             "PN": self.PN,
-            "MKSKIPPED": mkskipped_encoded,
+            "HKs": self.HKs,
+            "HKr": self.HKr,
+            "NHKs": self.NHKs,
+            "NHKr": self.NHKr,
         }
 
         return json.dumps(state_dict).encode("utf-8")
@@ -170,6 +140,11 @@ class States:
         state.Ns = state_dict["Ns"]
         state.Nr = state_dict["Nr"]
         state.PN = state_dict["PN"]
+
+        state.HKs = state_dict["HKs"]
+        state.HKr = state_dict["HKr"]
+        state.NHKs = state_dict["NHKs"]
+        state.NHKr = state_dict["NHKr"]
 
         state.MKSKIPPED = {}
         for key_str, mk_value_encoded in state_dict["MKSKIPPED"].items():
@@ -290,7 +265,11 @@ def HENCRYPT(hk, plaintext) -> bytes:
     key, auth_key, iv = helpers.get_mac_parameters(hk)
     cipher = AES.new(key, AES.MODE_CBC, iv)
     cipher_text = cipher.encrypt(pad(plaintext, AES.block_size))
-    hmac = helpers.build_verification_hash(auth_key, cipher_text)
+    hmac = helpers.build_verification_hash(
+        auth_key=auth_key, 
+        cipher_text=cipher_text,
+        associated_data=None
+    )
     return cipher_text + hmac.digest()
 
 
@@ -301,16 +280,26 @@ def ENCRYPT(mk, plaintext, associated_data) -> bytes:
     hmac = helpers.build_verification_hash(auth_key, associated_data, cipher_text)
     return cipher_text + hmac.digest()
 
+def HDECRYPT(hk, ciphertext):
+    # Throws an exception in case cannot verify
+    cipher_text = helpers.verify_signature(hk, ciphertext, None)
+    key, _, iv = helpers.get_mac_parameters(hk)
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    return unpad(cipher.decrypt(cipher_text), AES.block_size)
+
 
 def DECRYPT(mk, ciphertext, associated_data):
     # Throws an exception in case cannot verify
     cipher_text = helpers.verify_signature(mk, ciphertext, associated_data)
     key, _, iv = helpers.get_mac_parameters(mk)
-    # iv = cipher_text[:AES.block_size]
-    # data = cipher_text[AES.block_size:]
     cipher = AES.new(key, AES.MODE_CBC, iv)
     return unpad(cipher.decrypt(cipher_text), AES.block_size)
 
+
+def CONCAT_HE(ad: bytes, header: bytes):
+    # ex_len = struct.pack("<i", len(ad))
+    # return ex_len + ad + header.serialize()
+    return ad + header
 
 def CONCAT(ad: bytes, header: HEADERS):
     # ex_len = struct.pack("<i", len(ad))

@@ -6,15 +6,20 @@ from smswithoutborders_libsig.protocols import (
     GENERATE_DH,
     DH,
     KDF_CK,
+    KDF_RK_HE,
     ENCRYPT,
+    HENCRYPT,
     DECRYPT,
-    CONCAT,
-    DHRatchet,
+    HDECRYPT,
+    CONCAT_HE,
+    DHRatchetHE,
 )
 
 from smswithoutborders_libsig.keypairs import x25519
     
 class RatchetsHE:
+    MAX_SKIP = int(os.environ.get("MKSKIPPED", 100))
+
     """
     A class to handle the ratchet mechanism.
     """
@@ -28,15 +33,6 @@ class RatchetsHE:
         shared_nhkb: bytes,
         keystore_path: str = None
     ):
-        """
-        Initializes the state for Alice.
-
-        Args:
-            state (States): The state to be initialized.
-            SK (bytes): The shared secret key.
-            bob_dh_public_key (bytes): Bob's public Diffie-Hellman key.
-            keystore_path (str, optional): The path to the keystore. Defaults to None.
-        """
         state.DHRs = GENERATE_DH(keystore_path)
         state.DHRr = bob_dh_public_key
         state.RK, state.CKs, state.NHKs = KDF_RK_HE(SK, DH(state.DHRs, state.DHRr))
@@ -57,16 +53,8 @@ class RatchetsHE:
         shared_hka: bytes, 
         shared_nhkb: bytes
     ):
-        """
-        Initializes the state for Bob.
-
-        Args:
-            state (States): The state to be initialized.
-            SK (bytes): The shared secret key.
-            bob_dh_key_pair (Keypairs): Bob's Diffie-Hellman key pair.
-        """
-        state.DHs = bob_dh_key_pair
-        state.DHr = None
+        state.DHRs = bob_dh_key_pair
+        state.DHRr = None
         state.RK = SK
         state.CKs = None
         state.CKr = None
@@ -80,99 +68,55 @@ class RatchetsHE:
         state.NHKr = shared_hka
 
     @staticmethod
-    def RatchetEncryptHE(*, state: States, data: bytes, AD: bytes):
-        """
-        Encrypts data using the current state.
-
-        Args:
-            state (States): The current state.
-            data (bytes): The data to be encrypted.
-            AD (bytes): The associated data.
-
-        Returns:
-            tuple: A tuple containing the header and the encrypted data.
-        """
+    def RatchetEncryptHE(*, state: States, plaintext: bytes, AD: bytes):
         state.CKs, mk = KDF_CK(state.CKs)
         header = HEADERS(state.DHRs, state.PN, state.Ns)
-        enc_header = HENCRYPT(state.HKs, header)
+        enc_header = HENCRYPT(state.HKs, header.serialize())
         state.Ns += 1
-        return enc_header, ENCRYPT(mk, data, CONCAT(AD, enc_header))
+        return enc_header, ENCRYPT(mk, plaintext, CONCAT_HE(AD, enc_header))
 
     @staticmethod
     def RatchetDecryptHE(
         *, 
         state: States, 
-        enc_header: HEADERS, 
-        ciphertext: bytes, 
-        AD: bytes
+        enc_header: bytes, 
+        ciphertext: bytes,
+        AD: bytes,
     ) -> bytes:
-        """
-        Decrypts data using the current state.
-
-        Args:
-            state (States): The current state.
-            header (HEADERS): The header of the encrypted message.
-            ciphertext (bytes): The encrypted data.
-            AD (bytes): The associated data.
-
-        Returns:
-            bytes: The decrypted data.
-        """
-        plaintext = Ratchets.TrySkippedMessageKeysHE(state, enc_header, ciphertext, AD)
+        plaintext = RatchetsHE.TrySkippedMessageKeysHE(state, enc_header, ciphertext, AD)
         if plaintext:
             return plaintext
 
-        header, dh_ratchet = DecryptHeader(state, enc_header)
+        header, dh_ratchet = RatchetsHE.DecryptHeader(state, enc_header)
+        header = HEADERS.deserialize(header)
         if dh_ratchet:
-            Ratchets.SkipMessageKeysHE(state, header.pn)
-            DHRatchet(state, header)
+            RatchetsHE.SkipMessageKeysHE(state, header.pn)
+            DHRatchetHE(state, header)
 
-        Ratchets.SkipMessageKeysHE(state, header.n)
+        RatchetsHE.SkipMessageKeysHE(state, header.n)
         state.CKr, mk = KDF_CK(state.CKr)
         state.Nr += 1
-        return DECRYPT(mk, ciphertext, CONCAT(AD, enc_header))
+        return DECRYPT(mk, ciphertext, CONCAT_HE(AD, enc_header))
 
 
     @staticmethod
     def TrySkippedMessageKeysHE(
         state: States, 
-        enc_header: HEADERS, 
+        enc_header: bytes, 
         ciphertext: bytes, 
         AD: bytes
     ) -> bytes:
-        """
-        Tries to skip message keys if they are already present in the skipped keys.
-
-        Args:
-            state (States): The current state.
-            header (HEADERS): The header of the encrypted message.
-            ciphertext (bytes): The encrypted data.
-            AD (bytes): The associated data.
-
-        Returns:
-            bytes: The decrypted data if a skipped key is found, else None.
-        """
         for ((hk, n), mk) in state.MKSKIPPED.items():
             header = HDECRYPT(hk, enc_header)
             if header != None and header.n == n:
                 del state.MKSKIPPED[hk, n]
-                return DECRYPT(mk, ciphertext, CONCAT(AD, enc_header))
+                return DECRYPT(mk, ciphertext, CONCAT_HE(AD, enc_header))
 
         return None
     
     @staticmethod
     def SkipMessageKeysHE(state: States, until: int):
-        """
-        Skips message keys until a certain number is reached.
-
-        Args:
-            state (States): The current state.
-            until (int): The number until which to skip message keys.
-
-        Raises:
-            Exception: If the number of skipped keys exceeds MAX_SKIP.
-        """
-        if state.Nr + Ratchets.MAX_SKIP < until:
+        if state.Nr + RatchetsHE.MAX_SKIP < until:
             raise Exception("MAX_SKIP Exceeded")
 
         if state.CKr:
@@ -183,11 +127,118 @@ class RatchetsHE:
 
     @staticmethod
     def DecryptHeader(state, enc_header):
-        header = HDECRYPT(state.HKr, enc_header)
+        header = None
+        try:
+            header = HDECRYPT(state.HKr, enc_header)
+        except ValueError as e:
+            pass
+
         if header != None:
             return header, False
         header = HDECRYPT(state.NHKr, enc_header)
         if header != None:
             return header, True
-        raise Error()
+        raise Exception("Generic error decrypting header...")
 
+
+"""
+The implementations in __main__ are not an official test.
+This is a quick way of checking out things in the implementation.
+The original test would be found in the test_ files.
+"""
+if __name__ == "__main__":
+    import sys
+    import secrets
+    from cryptography.hazmat.primitives.asymmetric.x25519 import  X25519PrivateKey
+
+    bob = x25519("db_keys/bobs_keys.db")
+    bob_ek, bob_ehk, bob_enhk = bob.initHE() 
+    bob_static_keys = X25519PrivateKey.generate()
+
+    alice = x25519()
+    alice_ek, alice_ehk, alice_enhk = alice.initHE()
+
+    alice_nonce = secrets.token_bytes(16)
+    bob_nonce = secrets.token_bytes(16)
+
+    alice_ss, alice_hk, alice_nhk = alice.agreeWithAuthAndNonce(
+        auth_private_key=None,
+        auth_public_key=bob_static_keys.public_key(),
+        header_public_key=bob_ehk,
+        next_header_public_key=bob_enhk,
+        public_key=bob_ek,
+        nonce1=alice_nonce,
+        nonce2=bob_nonce,
+    )
+    bob_ss, bob_hk, bob_nhk = bob.agreeWithAuthAndNonce(
+        auth_private_key=bob_static_keys,
+        auth_public_key=None,
+        header_public_key=alice_ehk,
+        next_header_public_key=alice_enhk,
+        public_key=alice_ek,
+        nonce1=alice_nonce,
+        nonce2=bob_nonce,
+    )
+
+    assert alice_ss == bob_ss
+    assert alice_hk == bob_hk
+    assert bob_nhk == bob_nhk
+
+    # .... assuming in change in time
+
+    original_plaintext = b"Hello world"
+
+    alice_state = States()
+    bob_state = States()
+
+    RatchetsHE.alice_init_HE(
+        state=alice_state, 
+        SK=alice_ss, 
+        bob_dh_public_key=bob_ek, 
+        shared_hka=alice_hk, # should be same with bob
+        shared_nhkb=alice_enhk, # should be same with bob
+        keystore_path="db_keys/alice_keys.db"
+    )
+
+    bob1 = x25519("db_keys/bobs_keys.db")
+    bob1.load_keystore(bob.pnt_keystore, bob.secret_key)
+    RatchetsHE.bob_init_HE(
+        state=bob_state, 
+        SK=bob_ss, 
+        bob_dh_key_pair=bob1,
+        shared_hka=bob_hk, # should be same with alice
+        shared_nhkb=bob_enhk # should be same with alice
+    )
+
+    enc_header, alice_ciphertext = RatchetsHE.RatchetEncryptHE(
+        state=alice_state, 
+        plaintext=original_plaintext, 
+        AD = bob_static_keys.public_key().public_bytes_raw()
+    )
+
+    bob_plaintext = RatchetsHE.RatchetDecryptHE(
+        state=bob_state,
+        enc_header=enc_header,
+        ciphertext=alice_ciphertext,
+        AD = bob_static_keys.public_key().public_bytes_raw()
+    )
+
+    assert original_plaintext == bob_plaintext
+
+    for i in range(10):
+        print(i)
+        enc_header, alice_ciphertext = RatchetsHE.RatchetEncryptHE(
+            state=alice_state, 
+            plaintext=original_plaintext, 
+            AD = bob_static_keys.public_key().public_bytes_raw()
+        )
+
+    bob_plaintext = RatchetsHE.RatchetDecryptHE(
+        state=bob_state,
+        enc_header=enc_header,
+        ciphertext=alice_ciphertext,
+        AD = bob_static_keys.public_key().public_bytes_raw()
+    )
+
+    assert original_plaintext == bob_plaintext
+    print(bob_plaintext)

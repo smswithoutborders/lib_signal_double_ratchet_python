@@ -16,7 +16,7 @@ class Keystore:
 
     table_name = "_crypto"
 
-    def __init__(self, db_name, mk):
+    def __init__(self, db_name, mk, header_encryption=False):
         """
         Initializes the Keystore.
 
@@ -28,7 +28,10 @@ class Keystore:
         self.db_name = db_name
 
         with self._get_connection() as conn:
-            self.create(conn)
+            if header_encryption:
+                self.createHE(conn)
+            else:
+                self.create(conn)
 
     def _get_connection(self):
         """
@@ -41,6 +44,30 @@ class Keystore:
         conn.execute(f"PRAGMA key = \"x'{self.mk}'\";")
         conn.execute("PRAGMA cipher_compatibility = 3")
         return conn
+
+    def createHE(self, conn):
+        """
+        Creates the '_crypto' table if it doesn't exist.
+
+        Args:
+            conn (sqlite3.Connection): SQLite database connection.
+        """
+        with conn:
+            conn.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {self.table_name} (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    pnt TEXT NOT NULL UNIQUE,
+                    public_key BLOB NOT NULL,
+                    private_key BLOB NOT NULL,
+                    header_public_key BLOB NOT NULL,
+                    header_private_key BLOB NOT NULL,
+                    next_header_public_key BLOB NOT NULL,
+                    next_header_private_key BLOB NOT NULL,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
 
     def create(self, conn):
         """
@@ -61,6 +88,48 @@ class Keystore:
                 )
                 """
             )
+    
+
+    def storeHE(self, keypair: tuple, pnt):
+        """
+        Stores a keypair in the keystore.
+
+        Args:
+            keypair (tuple): A tuple containing (public_key, private_key).
+                - public_key (bytes): Public key bytes to be stored.
+                - private_key (bytes): Private key bytes to be stored.
+            pnt (str): Pointer or identifier associated with the keypair.
+
+        Returns:
+            int: The row ID of the inserted record.
+        """
+        (public_key, 
+        private_key, 
+        header_public_key, 
+        header_private_key, 
+        next_header_public_key, 
+        next_header_private_key) = keypair
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""INSERT INTO {self.table_name} 
+                (pnt,
+                public_key, 
+                private_key, 
+                header_public_key, 
+                header_private_key, 
+                next_header_public_key, 
+                next_header_private_key) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (pnt, 
+                 public_key,
+                 private_key,
+                 header_public_key,
+                 header_private_key,
+                 next_header_public_key,
+                 next_header_private_key),
+            )
+            conn.commit()
+            return cursor.lastrowid
 
     def store(self, keypair: tuple, pnt):
         """
@@ -84,6 +153,23 @@ class Keystore:
             )
             conn.commit()
             return cursor.lastrowid
+
+    def fetchHE(self, pnt):
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT * FROM {self.table_name} WHERE pnt = ?", (pnt,))
+            row = cursor.fetchone()
+
+            if not row:
+                return None
+
+            (public_key, 
+             private_key, 
+             header_public_key, 
+             header_private_key, 
+             next_header_public_key, 
+             next_header_private_key) = row[2], row[3], row[4], row[5], row[6], row[7]
+            return public_key, private_key, header_public_key, header_private_key, next_header_public_key, next_header_private_key
 
     def fetch(self, pnt):
         """

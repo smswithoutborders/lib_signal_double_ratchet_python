@@ -197,7 +197,9 @@ if __name__ == "__main__":
 
     s_header = header.serialize()
     a_header1 = HEADERS.deserialize(s_header)
-    assert header == a_header1
+    assert header.dh == a_header1.dh
+    assert header.pn == a_header1.pn
+    assert header.n == a_header1.n
 
     bob_state = States()
     bob1 = x25519("db_keys/bobs_keys.db")
