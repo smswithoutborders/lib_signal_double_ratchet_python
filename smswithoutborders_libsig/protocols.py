@@ -225,6 +225,17 @@ def DHRatchet(state: States, header: HEADERS):
     shared_secret = DH(state.DHs, state.DHr)
     state.RK, state.CKs = KDF_RK(state.RK, shared_secret)
 
+def DHRatchetHE(state: States, header: HEADERS):
+    state.PN = state.Ns
+    state.Ns = 0
+    state.Nr = 0
+    state.HKs = state.NHKs
+    state.HKr = state.NHKr
+    state.DHRr = header.dh
+    state.RK, state.CKr, state.NHKr = KDF_RK_HE(state.RK, DH(state.DHRs, state.DHRr))
+    state.DHRs = GENERATE_DH()
+    state.RK, state.CKs, state.NHKs = KDF_RK_HE(state.RK, DH(state.DHRs, state.DHRr))
+
 
 def GENERATE_DH(keystore_path: str = None, secret_key=None) -> bytes:
     x = x25519(keystore_path=keystore_path, secret_key=secret_key)
@@ -235,6 +246,20 @@ def GENERATE_DH(keystore_path: str = None, secret_key=None) -> bytes:
 def DH(dh_pair: x25519, dh_pub: bytes) -> bytes:
     return dh_pair.agree(dh_pub)
 
+def KDF_RK_HE(rk, dh_out):
+    length = 32
+    num_keys = 3
+
+    information = b"SMSWithoutBorders DRHE v2"
+
+    return HKDF(
+        master=dh_out,
+        key_len=length,
+        salt=rk,
+        hashmod=SHA512,
+        num_keys=num_keys,
+        context=information,
+    )
 
 def KDF_RK(rk, dh_out):
     length = 32
@@ -260,6 +285,13 @@ def KDF_CK(ck):
     d_ck = HMAC.new(ck, digestmod=SHA256)
     mk = d_ck.update(b"\x02").digest()
     return _ck, mk
+
+def HENCRYPT(hk, plaintext) -> bytes:
+    key, auth_key, iv = helpers.get_mac_parameters(hk)
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    cipher_text = cipher.encrypt(pad(plaintext, AES.block_size))
+    hmac = helpers.build_verification_hash(auth_key, cipher_text)
+    return cipher_text + hmac.digest()
 
 
 def ENCRYPT(mk, plaintext, associated_data) -> bytes:

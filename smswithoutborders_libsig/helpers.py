@@ -18,6 +18,7 @@ def get_mac_parameters(mk):
 
     key = hkdf_out[:32]
     auth_key = hkdf_out[32:64]
+    # iv = hkdf_out[64:]
     iv = hkdf_out[64:(64+16)]
 
     return key, auth_key, iv
