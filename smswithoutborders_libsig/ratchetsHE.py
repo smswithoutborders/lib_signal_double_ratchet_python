@@ -242,3 +242,4 @@ if __name__ == "__main__":
 
     assert original_plaintext == bob_plaintext
     print(bob_plaintext)
+    print("ENC_HE_LEN:", len(enc_header))
