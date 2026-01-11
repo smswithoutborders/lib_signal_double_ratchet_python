@@ -4,7 +4,7 @@ from smswithoutborders_libsig.protocols import (
     States,
     HEADERS,
     GENERATE_DH,
-    DH,
+    DH_HE,
     KDF_CK,
     KDF_RK_HE,
     ENCRYPT,
@@ -35,15 +35,15 @@ class RatchetsHE:
     ):
         state.DHRs = GENERATE_DH(keystore_path)
         state.DHRr = bob_dh_public_key
-        state.RK, state.CKs, state.NHKs = KDF_RK_HE(SK, DH(state.DHRs, state.DHRr))
+        state.RK, state.CKs, state.NHKs = KDF_RK_HE(SK, DH_HE(state.DHRs, state.DHRr))
         state.CKr = None
         state.Ns = 0
         state.Nr = 0
         state.PN = 0
         state.MKSKIPPED = {}
         state.HKs = shared_hka
-        state.MKSKIPPED = None
-        state.MKSKIPPED = shared_nhkb
+        state.HKr = None
+        state.NHKr = shared_nhkb
 
     @staticmethod
     def bob_init_HE(

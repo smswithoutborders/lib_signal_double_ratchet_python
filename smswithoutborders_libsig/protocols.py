@@ -209,9 +209,9 @@ def DHRatchetHE(state: States, header: HEADERS):
     state.HKs = state.NHKs
     state.HKr = state.NHKr
     state.DHRr = header.dh
-    state.RK, state.CKr, state.NHKr = KDF_RK_HE(state.RK, DH(state.DHRs, state.DHRr))
+    state.RK, state.CKr, state.NHKr = KDF_RK_HE(state.RK, DH_HE(state.DHRs, state.DHRr))
     state.DHRs = GENERATE_DH()
-    state.RK, state.CKs, state.NHKs = KDF_RK_HE(state.RK, DH(state.DHRs, state.DHRr))
+    state.RK, state.CKs, state.NHKs = KDF_RK_HE(state.RK, DH_HE(state.DHRs, state.DHRr))
 
 
 def GENERATE_DH(keystore_path: str = None, secret_key=None) -> bytes:
@@ -219,6 +219,12 @@ def GENERATE_DH(keystore_path: str = None, secret_key=None) -> bytes:
     x.init()
     return x
 
+
+def DH_HE(dh_pair: x25519, dh_pub: bytes) -> bytes:
+    return dh_pair.agree(
+        public_key=dh_pub, 
+        info = b"RelaySMS C2S DR Ratchet v1",
+    )
 
 def DH(dh_pair: x25519, dh_pub: bytes) -> bytes:
     return dh_pair.agree(dh_pub)
