@@ -30,6 +30,8 @@ class States:
 
     MKSKIPPED = {}
 
+    DHRs: x25519 = None
+    DHRr: bytes = None
     HKs: bytes = None
     HKr: bytes = None
     NHKs: bytes = None
