@@ -30,7 +30,7 @@ public class CryptoHelpers {
 
     public static Mac buildVerificationHash(byte[] authKey, byte[] AD, byte[] cipherText) throws GeneralSecurityException {
         Mac mac = CryptoHelpers.HMAC256(authKey);
-        byte[] updatedParams = Bytes.concat(AD, cipherText);
+        byte[] updatedParams = (AD == null) ? cipherText : Bytes.concat(AD, cipherText);
         mac.update(updatedParams);
         return mac;
     }

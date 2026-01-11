@@ -44,10 +44,20 @@ class SecurityCurve25519(val privateKey: ByteArray = Curve25519.generateRandomKe
         )[0]
     }
 
-    fun calculateSharedSecret(publicKey: ByteArray): ByteArray {
+    fun calculateSharedSecret(
+        publicKey: ByteArray,
+        salt: ByteArray? = null,
+        info: ByteArray? = "x25591_key_exchange".encodeToByteArray(),
+    ): ByteArray {
         val sharedKey = Curve25519.sharedSecret(this.privateKey, publicKey)
-        return CryptoHelpers.HKDF("HMACSHA256", sharedKey, null,
-            "x25591_key_exchange".encodeToByteArray(), 32, 1)[0]
+        return CryptoHelpers.HKDF(
+            "HMACSHA256",
+            sharedKey,
+            salt,
+            info,
+            32,
+            1
+        )[0]
     }
 
     fun getKeypair(): android.util.Pair<ByteArray, ByteArray> {

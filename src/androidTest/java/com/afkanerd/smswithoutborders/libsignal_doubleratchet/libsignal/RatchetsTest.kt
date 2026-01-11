@@ -48,7 +48,7 @@ class RatchetsTest {
 
         val bobPlainText1 = Ratchets.ratchetDecrypt(bobState, header1, aliceCipherText1,
             bob.generateKey())
-        println(bobState.serializedStates)
+        println(bobState.serialize())
 
         assertArrayEquals(originalText, bobPlainText)
         assertArrayEquals(originalText, bobPlainText1)
