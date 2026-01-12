@@ -114,6 +114,7 @@ class States:
             "Ns": self.Ns,
             "Nr": self.Nr,
             "PN": self.PN,
+            "MKSKIPPED": mkskipped_encoded,
             "HKs": base64.b64encode(self.HKs).decode("ascii") if self.HKs else None,
             "HKr": base64.b64encode(self.HKr).decode("ascii") if self.HKr else None,
             "NHKs": base64.b64encode(self.NHKs).decode("ascii") if self.NHKs else None,
