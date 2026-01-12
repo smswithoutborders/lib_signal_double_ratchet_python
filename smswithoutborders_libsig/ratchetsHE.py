@@ -210,6 +210,9 @@ if __name__ == "__main__":
         shared_nhkb=bob_enhk # should be same with alice
     )
 
+    # checking if can serialize
+    alice_state.serialize_json()
+
     enc_header, alice_ciphertext = RatchetsHE.RatchetEncryptHE(
         state=alice_state, 
         plaintext=original_plaintext, 

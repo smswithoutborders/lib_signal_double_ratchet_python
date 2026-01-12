@@ -90,10 +90,9 @@ class States:
         Serialize state to JSON format
         Returns bytes containing JSON-encoded state.
         """
+
         if (
-            not hasattr(self, "DHs")
-            or self.DHs is None
-            or not hasattr(self, "RK")
+            (self.DHs is None and self.DHRs is None)
             or self.RK is None
         ):
             raise Exception(
@@ -107,7 +106,7 @@ class States:
 
         state_dict = {
             "version": 1,
-            "DHs": base64.b64encode(self.DHs.serialize()).decode("ascii"),
+            "DHs": base64.b64encode(self.DHs.serialize()).decode("ascii") if self.DHs else None,
             "DHr": base64.b64encode(self.DHr).decode("ascii") if self.DHr else None,
             "RK": base64.b64encode(self.RK).decode("ascii"),
             "CKs": base64.b64encode(self.CKs).decode("ascii") if self.CKs else None,
@@ -115,10 +114,12 @@ class States:
             "Ns": self.Ns,
             "Nr": self.Nr,
             "PN": self.PN,
-            "HKs": self.HKs,
-            "HKr": self.HKr,
-            "NHKs": self.NHKs,
-            "NHKr": self.NHKr,
+            "HKs": base64.b64encode(self.HKs).decode("ascii") if self.HKs else None,
+            "HKr": base64.b64encode(self.HKr).decode("ascii") if self.HKr else None,
+            "NHKs": base64.b64encode(self.NHKs).decode("ascii") if self.NHKs else None,
+            "NHKr": base64.b64encode(self.NHKr).decode("ascii") if self.NHKr else None,
+            "DHRr": base64.b64encode(self.DHRr).decode("ascii") if self.DHRr else None,
+            "DHRs": base64.b64encode(self.DHRs.serialize()).decode("ascii") if self.DHRs else None,
         }
 
         return json.dumps(state_dict).encode("utf-8")
@@ -134,7 +135,7 @@ class States:
         if state_dict.get("version") != 1:
             raise ValueError(f"Unsupported state version: {state_dict.get('version')}")
 
-        state.DHs = x25519().deserialize(base64.b64decode(state_dict["DHs"]))
+        state.DHs = x25519().deserialize(base64.b64decode(state_dict["DHs"])) if state_dict["DHs"] else None
         state.RK = base64.b64decode(state_dict["RK"])
         state.DHr = base64.b64decode(state_dict["DHr"]) if state_dict["DHr"] else None
         state.CKs = base64.b64decode(state_dict["CKs"]) if state_dict["CKs"] else None
@@ -143,10 +144,13 @@ class States:
         state.Nr = state_dict["Nr"]
         state.PN = state_dict["PN"]
 
-        state.HKs = state_dict["HKs"]
-        state.HKr = state_dict["HKr"]
-        state.NHKs = state_dict["NHKs"]
-        state.NHKr = state_dict["NHKr"]
+
+        state.DHRs = x25519().deserialize(base64.b64decode(state_dict["DHRs"])) if state_dict["DHRs"] else None
+        state.DHRr = base64.b64decode(state_dict["DHRr"]) if state_dict["DHRr"] else None
+        state.HKr = base64.b64decode(state_dict["HKr"]) if state_dict["HKr"] else None
+        state.HKs = base64.b64decode(state_dict["HKs"]) if state_dict["HKs"] else None
+        state.NHKs = base64.b64decode(state_dict["NHKs"]) if state_dict["NHKs"] else None
+        state.NHKr = base64.b64decode(state_dict["NHKr"]) if state_dict["NHKr"] else None
 
         state.MKSKIPPED = {}
         for key_str, mk_value_encoded in state_dict["MKSKIPPED"].items():
