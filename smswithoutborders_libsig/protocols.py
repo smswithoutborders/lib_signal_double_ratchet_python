@@ -146,12 +146,12 @@ class States:
         state.PN = state_dict["PN"]
 
 
-        state.DHRs = x25519().deserialize(base64.b64decode(state_dict["DHRs"])) if state_dict["DHRs"] else None
-        state.DHRr = base64.b64decode(state_dict["DHRr"]) if state_dict["DHRr"] else None
-        state.HKr = base64.b64decode(state_dict["HKr"]) if state_dict["HKr"] else None
-        state.HKs = base64.b64decode(state_dict["HKs"]) if state_dict["HKs"] else None
-        state.NHKs = base64.b64decode(state_dict["NHKs"]) if state_dict["NHKs"] else None
-        state.NHKr = base64.b64decode(state_dict["NHKr"]) if state_dict["NHKr"] else None
+        state.DHRs = x25519().deserialize(base64.b64decode(state_dict.get("DHRs"))) if state_dict.get("DHRs") else None
+        state.DHRr = base64.b64decode(state_dict.get("DHRr")) if state_dict.get("DHRr") else None
+        state.HKr = base64.b64decode(state_dict.get("HKr")) if state_dict.get("HKr") else None
+        state.HKs = base64.b64decode(state_dict.get("HKs")) if state_dict.get("HKs") else None
+        state.NHKs = base64.b64decode(state_dict.get("NHKs")) if state_dict.get("NHKs") else None
+        state.NHKr = base64.b64decode(state_dict.get("NHKr")) if state_dict.get("NHKr") else None
 
         state.MKSKIPPED = {}
         for key_str, mk_value_encoded in state_dict["MKSKIPPED"].items():
