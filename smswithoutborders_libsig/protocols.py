@@ -214,8 +214,13 @@ def DHRatchetHE(state: States, header: HEADERS):
     state.HKr = state.NHKr
     state.DHRr = header.dh
     state.RK, state.CKr, state.NHKr = KDF_RK_HE(state.RK, DH_HE(state.DHRs, state.DHRr))
-    state.DHRs = GENERATE_DH()
+    state.DHRs = GENERATE_DH_HE(state.DHRs.keystore_path, state.DHRs.secret_key)
     state.RK, state.CKs, state.NHKs = KDF_RK_HE(state.RK, DH_HE(state.DHRs, state.DHRr))
+
+def GENERATE_DH_HE(keystore_path: str = None, secret_key=None) -> bytes:
+    x = x25519(keystore_path=keystore_path, secret_key=secret_key)
+    x.initHE()
+    return x
 
 
 def GENERATE_DH(keystore_path: str = None, secret_key=None) -> bytes:
