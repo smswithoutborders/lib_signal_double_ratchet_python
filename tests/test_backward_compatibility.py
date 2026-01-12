@@ -17,6 +17,7 @@ class TestBackwardCompatibility:
     def setup_method(self):
         """Setup test fixtures"""
         self.keystore_path = "db_keys/test_backward_compat.db"
+        self.dhrs_keystore_path = "db_keys/test_backward_compat_dhrs.db"
         self.dh_keypair = x25519(keystore_path=self.keystore_path)
         self.dh_keypair.init()
 
@@ -24,6 +25,8 @@ class TestBackwardCompatibility:
         """Cleanup test files"""
         if os.path.exists(self.keystore_path):
             os.remove(self.keystore_path)
+        if os.path.exists(self.dhrs_keystore_path):
+            os.remove(self.dhrs_keystore_path)
 
     def test_deserialize_state_without_header_encryption_fields(self):
         """Test deserializing a state that doesn't have header encryption fields"""
@@ -102,7 +105,7 @@ class TestBackwardCompatibility:
 
     def test_deserialize_state_with_all_header_encryption_fields(self):
         """Test deserializing a state with all header encryption fields"""
-        dh_rs_keypair = x25519(keystore_path="db_keys/test_dhrs.db")
+        dh_rs_keypair = x25519(keystore_path=self.dhrs_keystore_path)
         dh_rs_keypair.initHE()
 
         state_dict = {
@@ -139,10 +142,6 @@ class TestBackwardCompatibility:
         assert state.HKr is not None
         assert state.NHKs is not None
         assert state.NHKr is not None
-
-        # Cleanup
-        if os.path.exists("db_keys/test_dhrs.db"):
-            os.remove("db_keys/test_dhrs.db")
 
     def test_deserialize_state_with_mkskipped_no_header_fields(self):
         """Test deserializing a state with MKSKIPPED but no header encryption fields"""
