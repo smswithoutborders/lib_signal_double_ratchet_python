@@ -16,11 +16,42 @@ from smswithoutborders_libsig.keystore import Keystore
 
 
 class x25519:
-    def __init__(self, keystore_path=None, pnt_keystore=None, secret_key=None):
+    def __init__(
+        self, 
+        keystore_path=None, 
+        pnt_keystore=None, 
+        secret_key=None,
+    ):
         self.keystore_path = keystore_path
         self.pnt_keystore = pnt_keystore
         self.secret_key = secret_key
         self.size = 32
+
+    def initHE(self):
+        eC = X25519PrivateKey.generate()
+        eCHK = X25519PrivateKey.generate()
+        eCNHK = X25519PrivateKey.generate()
+        pk = eC.public_key().public_bytes_raw()
+        hk_pk = eCHK.public_key().public_bytes_raw()
+        nhk_pk = eCNHK.public_key().public_bytes_raw()
+
+        self.pnt_keystore = uuid.uuid4().hex
+
+        if not self.keystore_path:
+            self.keystore_path = f"db_keys/{self.pnt_keystore}.db"
+
+        self.secret_key = self.storeHE(
+            public_key=pk, 
+            private_key=eC.private_bytes_raw(), 
+            header_public_key=hk_pk, 
+            header_private_key=eCHK.private_bytes_raw(), 
+            next_header_public_key=nhk_pk, 
+            next_header_private_key=eCNHK.private_bytes_raw(), 
+            keystore_path=self.keystore_path, 
+            pnt_keystore=self.pnt_keystore, 
+            secret_key=self.secret_key
+        )
+        return pk, hk_pk, nhk_pk
 
     def init(self):
         x = X25519PrivateKey.generate()
@@ -75,6 +106,18 @@ class x25519:
         x.secret_key = data[(8 + keystore_path_len + pnt_keystore_len) :].decode()
         return x
 
+    def load_keystore_HE(self, pnt_keystore: str, secret_key: bytes):
+        if not self.keystore_path:
+            self.keystore_path = f"db_keys/{pnt_keystore}.db"
+        (public_key, private_key, 
+         _, header_private_key, 
+         _, next_header_private_key) = self.fetchHE(pnt_keystore, secret_key, self.keystore_path)
+        if public_key:
+            self.pnt_keystore = pnt_keystore
+            self.secret_key = secret_key
+
+            return X25519PrivateKey.from_private_bytes(private_key), X25519PrivateKey.from_private_bytes(header_private_key), X25519PrivateKey.from_private_bytes(next_header_private_key)
+
     def load_keystore(self, pnt_keystore: str, secret_key: bytes):
         if not self.keystore_path:
             self.keystore_path = f"db_keys/{pnt_keystore}.db"
@@ -109,6 +152,34 @@ class x25519:
         shared_key = x.exchange(X25519PublicKey.from_public_bytes(public_key))
         return self.__agree__(shared_key, info, salt)
 
+    def storeHE(
+            self, 
+            public_key, 
+            private_key, 
+            header_public_key, 
+            header_private_key, 
+            next_header_public_key, 
+            next_header_private_key, 
+            keystore_path, 
+            pnt_keystore, 
+            secret_key=None
+    ) -> bytes:
+        if not secret_key:
+            secret_key = secrets.token_bytes(self.size).hex()
+
+        keystore = Keystore(keystore_path, secret_key, True)
+        keystore.storeHE(keypair=(
+            public_key, 
+            private_key,
+            header_public_key,
+            header_private_key,
+            next_header_public_key,
+            next_header_private_key), 
+            pnt=pnt_keystore
+        )
+
+        return secret_key
+
     def store(self, pk, _pk, keystore_path, pnt_keystore, secret_key=None) -> bytes:
         if not secret_key:
             secret_key = secrets.token_bytes(self.size).hex()
@@ -117,6 +188,10 @@ class x25519:
         keystore.store(keypair=(pk, _pk), pnt=pnt_keystore)
 
         return secret_key
+
+    def fetchHE(self, pnt_keystore, secret_key, keystore_path=None):
+        keystore = Keystore(keystore_path, secret_key, True)
+        return keystore.fetchHE(pnt_keystore)
 
     def fetch(self, pnt_keystore, secret_key, keystore_path=None):
         keystore = Keystore(keystore_path, secret_key)
@@ -130,18 +205,23 @@ class x25519:
             info=info,
         ).derive(secret_key)
 
-    def agreeWithAuthAndNonce(
+    def __agreeWithAuthAndNonce__(
         self,
+        eph_private_key: X25519PrivateKey,
         auth_private_key: X25519PrivateKey,  # Clients have this as static keypairs
+        auth_public_key: X25519PublicKey,
         public_key: bytes,
         nonce1: bytes,
         nonce2: bytes,
         salt: bytes = b"RelaySMS v1",
         info: bytes = b"RelaySMS C2S DR v1",
-    ) -> bytes:
+    ): 
         handshake_salt = nonce1 + nonce2
-        eph_private_key = self.load_keystore(self.pnt_keystore, self.secret_key)
-        dh1 = auth_private_key.exchange(X25519PublicKey.from_public_bytes(public_key))
+
+        if auth_private_key == None:
+            dh1 = eph_private_key.exchange(auth_public_key)
+        else:
+            dh1 = auth_private_key.exchange(X25519PublicKey.from_public_bytes(public_key))
         dh2 = eph_private_key.exchange(X25519PublicKey.from_public_bytes(public_key))
 
         chain_key = HKDF(
@@ -164,3 +244,48 @@ class x25519:
             salt=chain_key,
             info=info,
         ).derive(dh2)
+
+    def agreeWithAuthAndNonce(
+        self,
+        auth_private_key: X25519PrivateKey,  # Clients have this as static keypairs
+        auth_public_key: X25519PublicKey,
+        public_key: bytes,
+        header_public_key: bytes,
+        next_header_public_key: bytes,
+        nonce1: bytes,
+        nonce2: bytes,
+    ) -> bytes:
+        header_info=b"RelaySMS C2S DRHE v1"
+        eph_private_key, header_private_key, next_header_private_key = self.load_keystore_HE(self.pnt_keystore, self.secret_key)
+
+        root_key = self.__agreeWithAuthAndNonce__(
+            eph_private_key=eph_private_key,
+            auth_private_key=auth_private_key,
+            auth_public_key=auth_public_key,
+            public_key=public_key,
+            nonce1=nonce1,
+            nonce2=nonce2,
+        )
+
+        header_key = self.__agreeWithAuthAndNonce__(
+            eph_private_key=header_private_key,
+            auth_private_key=auth_private_key,
+            auth_public_key=auth_public_key,
+            public_key=header_public_key,
+            nonce1=nonce1,
+            nonce2=nonce2,
+            info = header_info
+        )
+
+        next_header_key = self.__agreeWithAuthAndNonce__(
+            eph_private_key=next_header_private_key,
+            auth_private_key=auth_private_key,
+            auth_public_key=auth_public_key,
+            public_key=next_header_public_key,
+            nonce1=nonce1,
+            nonce2=nonce2,
+            info = header_info
+        )
+
+        return root_key, header_key, next_header_key
+

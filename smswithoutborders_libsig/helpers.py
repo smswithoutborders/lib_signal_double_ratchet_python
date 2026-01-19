@@ -3,8 +3,14 @@ from Crypto.Hash import SHA512, SHA256, HMAC
 from Crypto.Protocol.KDF import HKDF
 
 def build_verification_hash(auth_key, associated_data, cipher_text):
-    return HMAC.new(auth_key, digestmod=SHA256).update(
-            associated_data + cipher_text)
+    if associated_data:
+        input = associated_data + cipher_text
+    else:
+        input = cipher_text
+    return HMAC.new(
+        auth_key, 
+        digestmod=SHA256
+    ).update(input)
 
 def get_mac_parameters(mk):
     hash_len = 80
@@ -18,6 +24,7 @@ def get_mac_parameters(mk):
 
     key = hkdf_out[:32]
     auth_key = hkdf_out[32:64]
+    # iv = hkdf_out[64:]
     iv = hkdf_out[64:(64+16)]
 
     return key, auth_key, iv
