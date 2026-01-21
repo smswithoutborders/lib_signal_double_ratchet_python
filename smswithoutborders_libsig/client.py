@@ -176,11 +176,7 @@ def ratchet_with_noise_ik():
 
     bob_static_keys = X25519PrivateKey.generate()
     bob = keypairs.x25519("db_keys/bobs_keys.db")
-    bob.initHE(
-        bob_static_keys,
-        bob_static_keys,
-        bob_static_keys,
-    )
+    bob.initHE(bob_static_keys)
 
     alice_hash, alice_enc_public_key, alice_rk, alice_hk, alice_nhk = alice.agreeWithNoiseIKPattern(
         client_static_private_key = alice_static_keys, 
