@@ -1,4 +1,4 @@
 #!/bin/bash
 
 rm db_keys/*
-python -m smswithoutborders_libsig.ratchetsHE
+python -m smswithoutborders_libsig.client
