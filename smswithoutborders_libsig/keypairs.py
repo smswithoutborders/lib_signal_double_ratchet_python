@@ -529,3 +529,95 @@ class x25519:
         )
 
         return h, server_eph_pk_bytes, root_key1, header_key1, next_header_key1
+
+    def agreeWithNoiseNKPattern(
+        self,
+        client_nonce: bytes,
+        server_nonce: bytes,
+        salt: bytes = b"RelaySMS_NK_handshake_v1",
+        eC: Optional[X25519PrivateKey] = None,
+        eC_pk: Optional[bytes] = None,
+        SI_pk: Optional[bytes] = None,
+        SI: Optional[X25519PrivateKey] = None,
+        eS_pk: Optional[bytes] = None,
+        eS: Optional[X25519PrivateKey] = None,
+    ) -> Tuple[bytes, bytes, bytes]:
+        """
+        Noise NK handshake.
+
+        Args:
+            client_nonce: 16 bytes
+            server_nonce: 16 bytes
+            salt: HKDF salt (default: b"RelaySMS_NK_handshake_v1")
+            eC: Client ephemeral X25519PrivateKey (client: default self)
+            eC_pk: Client ephemeral public key bytes (server)
+            SI_pk: Server static public key bytes (client)
+            SI: Server static X25519PrivateKey (server)
+            eS_pk: Server ephemeral public key bytes (client)
+            eS: Server ephemeral X25519PrivateKey (server: default self)
+
+        Returns:
+            RK0: Root key
+            HK: Header key
+            NHK: Next header key
+        """
+        is_client = SI is None
+
+        if is_client:
+            if eC is None:
+                eC = self.load_keystore(self.pnt_keystore, self.secret_key)
+
+            assert eC is not None
+            assert SI_pk is not None
+            assert eS_pk is not None
+
+            eC_pk_raw = eC.public_key().public_bytes_raw()
+            SI_pk_x25519 = X25519PublicKey.from_public_bytes(SI_pk)
+            eS_pk_x25519 = X25519PublicKey.from_public_bytes(eS_pk)
+
+            info = hashlib.sha256(
+                client_nonce + server_nonce + eC_pk_raw + eS_pk + SI_pk
+            ).digest()
+
+            dh1 = eC.exchange(SI_pk_x25519)
+            dh2 = eC.exchange(eS_pk_x25519)
+
+        else:
+            if eS is None:
+                eS = self.load_keystore(self.pnt_keystore, self.secret_key)
+
+            assert SI is not None
+            assert eS is not None
+            assert eC_pk is not None
+
+            eC_pk_x25519 = X25519PublicKey.from_public_bytes(eC_pk)
+            SI_pk_raw = SI.public_key().public_bytes_raw()
+            eS_pk_raw = eS.public_key().public_bytes_raw()
+
+            info = hashlib.sha256(
+                client_nonce + server_nonce + eC_pk + eS_pk_raw + SI_pk_raw
+            ).digest()
+
+            dh1 = SI.exchange(eC_pk_x25519)
+            dh2 = eS.exchange(eC_pk_x25519)
+
+            eS_pk = eS_pk_raw
+
+        CK = HKDF(
+            master=dh1,
+            key_len=self.size,
+            salt=salt,
+            hashmod=SHA256,
+            context=info,
+        )
+
+        RK0, HK, NHK = HKDF(
+            master=dh2,
+            key_len=self.size,
+            salt=CK,
+            hashmod=SHA256,
+            context=info,
+            num_keys=3,
+        )
+
+        return RK0, HK, NHK
