@@ -234,6 +234,7 @@ def DH_HE(dh_pair: x25519, dh_pub: bytes) -> bytes:
     return dh_pair.agree(
         public_key=dh_pub, 
         info = b"RelaySMS C2S DR Ratchet v1",
+        header_encrypted=True
     )
 
 def DH(dh_pair: x25519, dh_pub: bytes) -> bytes:
@@ -299,11 +300,15 @@ def ENCRYPT(mk, plaintext, associated_data) -> bytes:
     return cipher_text + hmac.digest()
 
 def HDECRYPT(hk, ciphertext):
-    # Throws an exception in case cannot verify
-    cipher_text = helpers.verify_signature(hk, ciphertext, None)
-    key, _, iv = helpers.get_mac_parameters(hk)
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    return unpad(cipher.decrypt(cipher_text), AES.block_size)
+    try:
+        cipher_text = helpers.verify_signature(hk, ciphertext, None)
+    except ValueError as e:
+        print(e)
+    else:
+        key, _, iv = helpers.get_mac_parameters(hk)
+        cipher = AES.new(key, AES.MODE_CBC, iv)
+        return unpad(cipher.decrypt(cipher_text), AES.block_size)
+    return None
 
 
 def DECRYPT(mk, ciphertext, associated_data):
